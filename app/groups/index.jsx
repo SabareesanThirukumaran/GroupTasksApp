@@ -31,8 +31,16 @@ export default function GroupScreen() {
     },
 
   ])
+  const [selectedGroup, setSelectedGroup] = useState(null);
+  const [modalVisible, setModalVisible] = useState(false);
+
+  const groupOpen = (group) => {
+    setSelectedGroup(group)
+    setModalVisible(true);
+  }
+
   const renderGroup = ({item}) => {
-    return (<TouchableOpacity style={styles.groupCard}>
+    return (<TouchableOpacity style={styles.groupCard} onPress={() => groupOpen(item)}>
       <View style={styles.frontText}>
         <View style={styles.groupIcon}>
           <Ionicons name="book-sharp" color={Colours.primaryText} size={30}></Ionicons>
@@ -61,7 +69,7 @@ export default function GroupScreen() {
       <FlatList
       data={userGroups}
       renderItem={renderGroup}
-      keyExtractor={(item) => item.id}
+      keyExtractor={(item) => item.id.toString()}
       contentContainerStyle={{paddingBottom: 20}}
       ListHeaderComponent={
         <View>
@@ -86,6 +94,14 @@ export default function GroupScreen() {
           </View>
         </View>
       }/>
+
+      <Modal visible={modalVisible} animationType="slide" onRequestClose={() => setModalVisible(false)}>
+        <View style={{flex: 1, backgroundColor: Colours.background, padding: 20}}>
+          {selectedGroup && (<>
+            <Text style={{fontSize: 28, fontWeight: "bold", color: Colours.defaultText}}></Text>
+          </>)}
+        </View>
+      </Modal>
     </View>
   );
 }
