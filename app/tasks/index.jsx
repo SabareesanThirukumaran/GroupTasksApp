@@ -202,9 +202,9 @@ export default function TaskScreen() {
           onPress={() => toggleComplete(item.id)}
         >
           {item.completed ? (
-            <AntDesign name="checkcircle" size={28} color="green" />
+            <AntDesign name="check-circle" size={28} color="green" />
           ) : (
-            <AntDesign name="checkcircleo" size={28} color="gray" />
+            <AntDesign name="check-circle" size={28} color="gray" />
           )}
         </TouchableOpacity> */}
       </Swipeable>
@@ -308,7 +308,7 @@ export default function TaskScreen() {
               </TouchableOpacity>
               <View style={styles.tasksSearchContainer}>
                 <AntDesign
-                  name="search1"
+                  name="search"
                   size={24}
                   color={Colours.defaultText}
                 />
@@ -359,7 +359,7 @@ export default function TaskScreen() {
               </TouchableOpacity>
               <View style={styles.tasksSearchContainer}>
                 <AntDesign
-                  name="search1"
+                  name="search"
                   size={24}
                   color={Colours.defaultText}
                 />
@@ -519,13 +519,13 @@ const styles = StyleSheet.create({
 
   topHeader: {
     backgroundColor: Colours.background,
-    borderBottomColor: "#65656535",
-    borderBottomWidth: 1,
+    borderBottomColor: "#35353525",
+    borderBottomWidth: 0.75,
     marginBottom: 20,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "flex-start",
-    paddingLeft: 15
+    padding: 15
   },
 
   topHeaderText: {
@@ -583,7 +583,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: 15,
     marginBottom: 12,
-    elevation: 2,
     width: width * 0.85,
     flexDirection: "row",
     position: "relative",

@@ -51,9 +51,9 @@ export default function home() {
               </Text>
               <TouchableOpacity style={styles.completeButton} onPress={() => toggleComplete(item.id)} >
                   {item.completed ? (
-                  <AntDesign name="checkcircle" size={28} color="green" />
+                  <AntDesign name="check-circle" size={28} color="green" />
                   ) : (
-                  <AntDesign name="checkcircleo" size={28} color="gray" />
+                  <AntDesign name="check-circle" size={28} color="gray" />
                   )}
               </TouchableOpacity>
           </View>
@@ -80,7 +80,7 @@ export default function home() {
       <View style={styles.todayInfo}>
         <View style={styles.todayHeader}>
           <TouchableOpacity style={styles.upcomingButt} onPress={() => router.push("/tasks")}>
-            <AntDesign name="doubleleft" size={15} color={Colours.primaryText} />
+            <AntDesign name="double-left" size={15} color={Colours.primaryText} />
           </TouchableOpacity>
           <Text style={styles.todayTask}>Today's Tasks</Text>
         </View>

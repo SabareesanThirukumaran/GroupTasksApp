@@ -11,7 +11,7 @@
   "dependencies": {
     "@react-native-community/datetimepicker": "8.4.1",
     "babel-preset-expo": "~13.0.0",
-    "expo": "~53.0.22",
+    "expo": "^54.0.0",
     "expo-constants": "~17.1.7",
     "expo-linking": "~7.1.7",
     "expo-router": "~5.1.5",
@@ -28,8 +28,7 @@
     "react-native-safe-area-context": "5.4.0",
     "react-native-screens": "~4.11.1",
     "react-native-svg": "15.11.2",
-    "react-native-web": "^0.20.0",
-    "victory-native": "^41.19.3"
+    "react-native-web": "^0.20.0"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0"

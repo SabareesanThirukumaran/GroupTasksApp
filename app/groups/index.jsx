@@ -80,7 +80,7 @@ export default function GroupScreen() {
 
           <View style={styles.searchItems}>
             <View style={styles.tasksSearchContainer}>
-              <AntDesign name="search1" size={18} color={Colours.defaultText} />
+              <AntDesign name="search" size={18} color={Colours.defaultText} />
               <TextInput placeholder="Find a Group" style={{fontSize: 16, flex: 1, paddingVertical: 0}}/>
             </View>
 
@@ -96,9 +96,12 @@ export default function GroupScreen() {
       }/>
 
       <Modal visible={modalVisible} animationType="slide" onRequestClose={() => setModalVisible(false)}>
-        <View style={{flex: 1, backgroundColor: Colours.background, padding: 20}}>
+        <View style={{flex: 1, backgroundColor: Colours.background}}>
           {selectedGroup && (<>
-            <Text style={{fontSize: 28, fontWeight: "bold", color: Colours.defaultText}}></Text>
+            <View style={styles.topHeaderOpen}>
+            <Ionicons name="people-circle-outline" color={Colours.primary} size={40}></Ionicons>
+            <Text style={styles.topHeaderText}>Groups</Text>
+          </View>
           </>)}
         </View>
       </Modal>
@@ -116,13 +119,13 @@ const styles = StyleSheet.create({
 
   topHeader: {
     backgroundColor: Colours.background,
-    borderBottomColor: "#65656535",
-    borderBottomWidth: 1,
-    marginBottom: 20,
+    borderBottomColor: "#35353525",
+    borderBottomWidth: 0.6,
+    marginBottom: 6,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "flex-start",
-    paddingLeft: 15
+    padding: 15
   },
 
   topHeaderText: {
@@ -135,7 +138,7 @@ const styles = StyleSheet.create({
   searchItems: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center"
+    margin: 15
   },
 
   tasksSearchContainer: {
@@ -146,7 +149,7 @@ const styles = StyleSheet.create({
     width: 250,
     paddingHorizontal: 10,
     marginHorizontal: 10,
-    height: 50,
+    height: 40,
     flexDirection: "row",
     alignSelf: "flex-start",
     alignItems: "center",
@@ -165,9 +168,9 @@ const styles = StyleSheet.create({
 
   groupsText: {
     fontSize: 27,
-    fontWeight: 700,
-    marginLeft: 15,
-    marginTop: 15,
+    fontWeight: 400,
+    marginLeft: 30,
+    paddingBottom: 15
   },
 
   groupCard: {
@@ -176,16 +179,12 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 15,
     marginBottom: 15,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowOffset: { width: 0, height: 3 },
-    shadowRadius: 4,
-    elevation: 2,
-    width: width * 0.85,
+    borderColor: Colours.surfaceBorder,
+    borderWidth: 0.65,
+    width: width * 0.88,
     flexDirection: "row",
     justifyContent: "space-between",
-    gap: 10,
-    marginVertical: 10,
+    alignItems: "center",
   },
 
   frontText: {
