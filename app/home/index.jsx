@@ -2,96 +2,105 @@ import React, {useState} from "react";
 import { View, StyleSheet, Dimensions, Text, FlatList, TouchableOpacity } from "react-native";
 import Svg, { Path, G, Circle} from "react-native-svg";
 import { Color as Colours } from "../../constants/colors";
-import { AntDesign } from "@expo/vector-icons";
+import { AntDesign, FontAwesome, Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { Colors } from "react-native/Libraries/NewAppScreen";
 const width = Dimensions.get("window").width;
+const height = Dimensions.get("window").height;
 
 export default function home() {
-  const router = useRouter();
-  const carouselItems = [
-  {id: "1", title: "Tasks Completed :", info: "329"},
-  {id: "2", title: "Groups Joined :", info: "12"},
-  {id: "3", title: "Need Help ?", info: "Email us"}
-  ];
-  const [todayTasks, setTodayTasks] = useState([
-      {
-          id: "1",
-          name: "Finish React Native project",
-          time: "10:00 AM",
-          creator: "John",
-          completed: false,
-      },
-      {
-          id: "2",
-          name: "Study Physics notes",
-          time: "3:00 PM",
-          creator: "Alice",
-          completed: false,
-      },
-  ]);
-  const infoData = [
-    {name: "John", tasks: 5},
-    {name: "Amy", tasks: 3},
-    {name: "Others", tasks: 2}
-  ]
-
-  const toggleComplete = (id) => {
-    setTodayTasks((prev) => 
-        prev.map((task) => 
-            task.id === id ? {...task, completed: !task.completed } : task
-        )
-    );
-  };
-
-  const renderTask = ({item}) => {
-      return (<View style={styles.taskCard}>
-          <View style={styles.topRow}>
-              <Text style={[ styles.taskName, item.completed && { textDecorationLine: "line-through", opacity: 0.5 }, ]} >
-                  {item.name}
-              </Text>
-              <TouchableOpacity style={styles.completeButton} onPress={() => toggleComplete(item.id)} >
-                  {item.completed ? (
-                  <AntDesign name="check-circle" size={28} color="green" />
-                  ) : (
-                  <AntDesign name="check-circle" size={28} color="gray" />
-                  )}
-              </TouchableOpacity>
-          </View>
-          <Text style={styles.metaText}>
-          {item.time} • {item.creator}
-          </Text>
-      </View>)
-  }
 
   return (
     <View style={styles.entire}>
-
       <View style={styles.container}>
         <Svg height={140} width="100%" viewBox="0 0 1440 320" preserveAspectRatio="xMidYMin slice" style={styles.svg}>
           <Path fill={Colours.primary} d="M0 0 H1440 C1300 50, 1100 300, 900 260 C700 200, 500 400, 300 260 C150 100, 75 100, 0 260 Z" />
         </Svg>
 
         <View style={styles.headerContent}>
-            <Text style={styles.greeting}>Hi User,</Text>
+            <View style={styles.headerText}>
+              <Text style={styles.greeting}>Welcome back, Sabs</Text>
+              <Text style={styles.overview}>Here's your overview</Text>
+            </View>
             <AntDesign name="logout" size={28} color={Colours.primaryText} style={styles.logout}></AntDesign>
         </View>
       </View>
 
-      <View style={styles.todayInfo}>
-        <View style={styles.todayHeader}>
-          <TouchableOpacity style={styles.upcomingButt} onPress={() => router.push("/tasks")}>
-            <AntDesign name="double-left" size={15} color={Colours.primaryText} />
-          </TouchableOpacity>
-          <Text style={styles.todayTask}>Today's Tasks</Text>
+      <View style={styles.userMain}>
+
+        <View style={styles.topUser}>
+
+          <View style={styles.todayTask}>
+
+            <View style={styles.headerRow}>
+              <View style={styles.accentBar} />
+              <Text style={styles.todayTaskText}>Today's Tasks</Text>
+            </View>
+
+            <View style={styles.taskTextContainer}>
+              <Text style={styles.numTask}>3</Text>
+              <Text style={styles.taskType}>Remaining</Text>
+            </View>
+
+            <View style={styles.taskTextContainer}>
+              <Text style={styles.numTask}>1</Text>
+              <Text style={styles.taskType}>Completed</Text>
+            </View>
+
+          </View>
+
+          <View style={styles.userGroups}>
+
+            <View style={styles.headerRow}>
+              <View style={styles.accentBarGroups} />
+              <Text style={styles.todayTaskText}>
+                <FontAwesome name="group" size={18} color="#0F6EC6" /> Your Groups
+              </Text>
+            </View>
+
+            <View style={styles.taskTextContainer}>
+              <Text style={styles.numTask}>2</Text>
+              <Text style={styles.taskType}>Active</Text>
+            </View>
+
+            <View style={styles.taskTextContainer}>
+              <Text style={styles.numTask}>28</Text>
+              <Text style={styles.taskType}>Members total</Text>
+            </View>
+
+          </View>
+
         </View>
-        <View style={[styles.taskContainer, {height: 175}]}>
-          <FlatList data={todayTasks}
-          renderItem={renderTask}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={{paddingBottom: 20}}
-          showsVerticalScrollIndicator={true}
-          />
+
+        <View style={styles.userProgress}></View>
+
+      </View>
+
+      <View style={styles.quickActions}>
+        <Text style={styles.quickText}>Quick Actions</Text>
+
+        <View style={styles.actionGroup}>
+          <View style={styles.AddTask}></View>
+          <View style={styles.CreateGroup}></View>
+          <View style={styles.ViewStats}></View>
         </View>
+
+      </View>
+
+      <View style={styles.upcomingTasks}>
+        <Text style={styles.upcomingText}>Upcoming Tasks</Text>
+
+        <View style={styles.taskContainer}></View>
+      </View>
+
+      <View style={styles.activeGroups}>
+        <Text style={styles.activeText}>Active Groups</Text>
+
+        <View style={styles.mainGroups}>
+          <View style={styles.group1}></View>
+          <View style={styles.group2}></View>
+        </View>
+
       </View>
 
     </View>
@@ -99,6 +108,100 @@ export default function home() {
 }
 
 const styles = StyleSheet.create({
+
+  userMain: {
+    display: "flex",
+    flexDirection:"column",
+    margin: width * 0.075,
+  },
+
+  topUser: {
+    flexDirection: "row",
+  },
+
+  todayTask: {
+    backgroundColor: Colours.surface,
+    paddingHorizontal: 15,
+    flex: 1,
+    borderRadius: 16,
+    minWidth: width * 0.2,
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowOffset: {width: 0, height: 2},
+    shadowRadius: 6,
+    justifyContent: "center",
+    alignItems: "flex-start",
+  },
+
+  todayTaskText: {
+    fontWeight: "900",
+    fontSize: 16,
+    color: Colours.defaultText,
+    letterSpacing: 0.2,
+    flexShrink: 0,
+    maxWidth: "100%",
+    includeFontPadding: false,
+  },
+
+
+  taskTextContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+  numTask: {
+    fontWeight: 700,
+    fontSize: 25,
+    color: Colours.defaultText,
+    marginRight: 8,
+  },
+
+  taskType: {
+    fontWeight: 400,
+    fontSize: 16,
+    color: Colours.grayText
+  },
+
+  userGroups: {
+    flex: 2.3,
+    backgroundColor: Colours.surface,
+    marginLeft: 15,
+    borderRadius: 16,
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowOffset: {width: 0, height: 2},
+    shadowRadius: 6,
+    padding: 20,
+    height: height * 0.15,
+    justifyContent: "center",
+    alignItems: "flex-start",
+  },
+
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+
+  accentBar: {
+    width: 5,
+    height: 22,
+    borderRadius: 5,
+    backgroundColor: Colours.primary,
+    marginRight: 10,
+  },
+
+  accentBarGroups: {
+    width: 5,
+    height: 22,
+    borderRadius: 5,
+    backgroundColor: "#0F6EC6",
+    marginRight: 10,
+  },
+
+
   entire: {
     flex: 1,
     backgroundColor: Colours.background,
@@ -127,131 +230,14 @@ const styles = StyleSheet.create({
     color: Colours.primaryText,
   },
 
+  overview: {
+    fontWeight: 400,
+    fontSize: 18,
+    color: "#d8d8d8ff"
+  },
+
   svg: {
     position: "absolute"
   },
 
-  todayInfo: {
-    flexDirection: "column",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
-  todayTask: {
-    color: Colours.primary,
-    paddingRight: 20,
-    marginLeft: 10,
-    marginBottom: 10,
-    alignSelf:"flex-end",
-    fontWeight: 900,
-    fontSize: 24
-  },
-
-  taskCard: {
-    backgroundColor: Colours.primaryText,
-    borderRadius: 10,
-    padding: 30,
-    marginBottom: 15,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowOffset: { width: 0, height: 3 },
-    shadowRadius: 4,
-    elevation: 2,
-    width: width * 0.85,
-  },
-
-  topRow: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-      alignItems: "center",
-  },
-
-  taskName: {
-      fontSize: 20,
-      fontWeight: "700",
-      color: Colours.defaultText,
-      marginRight: 10,
-      flexShrink: 1,
-  },
-
-  metaText: {
-      fontSize: 13,
-      color: Colours.textSecondary,
-      marginTop: 6,
-  },
-
-  upcomingButt: {
-    backgroundColor: Colours.primary,
-    alignItems: "center",
-    padding: 7,
-    width: width * 0.08, 
-    borderRadius: 15,
-    elevation: 2,
-  },
-
-  upcomingText: {
-    fontWeight: 900,
-    color: Colours.textOnPrimary,
-  },
-
-  todayHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    marginLeft: 10,
-    alignSelf: "flex-end"
-  },
-
-  otherStats: {
-    flexDirection: "row",
-    justifyContent: "space-evenly",
-    width: "100%"
-  },
-
-  groupStatText: {
-    fontWeight: 700,
-    fontSize: 20,
-    marginBottom: 5,
-  },
-
-  leftHandGraph: {
-    alignItems: "center",
-    backgroundColor: Colours.card,
-    borderRadius: 10,
-    marginTop: 10
-  },
-
-  changeGroupButton: {
-    backgroundColor: Colours.secondary,
-    padding: 10,
-    borderRadius: 5,
-    marginBottom: 5,
-  },
-
-  legend: {
-    marginTop: 10,
-    alignItems: "center",
-    justifyContent: "center",
-    flexDirection: "row",
-  },
-
-  labelRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 5,
-    marginHorizontal: 5
-  },
-
-  colorBox: {
-    width: 15,
-    height: 15,
-    marginRight: 5,
-    borderRadius: 3
-  },
-
-  labelText: {
-    fontSize: 14,
-    fontWeight: 600,
-    color: Colours.textPrimary
-  }
 });

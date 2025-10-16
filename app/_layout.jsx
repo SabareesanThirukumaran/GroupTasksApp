@@ -19,7 +19,7 @@ export default function index() {
         lazy: false,
         // animation: "none",
       }}
-      initialRouteName="groups"
+      initialRouteName="home"
     >
       <Tabs.Screen
         name="home"

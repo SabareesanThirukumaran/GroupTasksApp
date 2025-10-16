@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { ScrollView, Swipeable } from "react-native-gesture-handler";
 import { Color, Color as Colours } from "../../constants/colors";
-import { AntDesign, Ionicons } from "@expo/vector-icons";
+import { AntDesign, Ionicons, FontAwesome } from "@expo/vector-icons";
 import React, { useEffect, useRef, useState } from "react";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import Fuse from "fuse.js";
@@ -307,7 +307,7 @@ export default function TaskScreen() {
                 <Ionicons name="filter" size={24} color={Colours.defaultText} />
               </TouchableOpacity>
               <View style={styles.tasksSearchContainer}>
-                <AntDesign
+                <FontAwesome
                   name="search"
                   size={24}
                   color={Colours.defaultText}
@@ -358,7 +358,7 @@ export default function TaskScreen() {
                 <Ionicons name="filter" size={24} color={Colours.defaultText} />
               </TouchableOpacity>
               <View style={styles.tasksSearchContainer}>
-                <AntDesign
+                <FontAwesome
                   name="search"
                   size={24}
                   color={Colours.defaultText}

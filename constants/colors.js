@@ -3,7 +3,7 @@ export const Color = {
   surface: "#f9f9f9",
   surfaceBorder: "#d9d9e0",
   primary: "#0860bd",
-  secondary: "#03dac6",
+  secondary: "rgba(255, 255, 255, 1)",
   defaultText: "#000000",
   grayText: "#656565",
   primaryText: "#ffffff",
