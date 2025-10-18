@@ -197,16 +197,6 @@ export default function TaskScreen() {
         >
           <Text>{task.difficulty}</Text>
         </View>
-        {/* <TouchableOpacity
-          style={styles.completeButton}
-          onPress={() => toggleComplete(item.id)}
-        >
-          {item.completed ? (
-            <AntDesign name="check-circle" size={28} color="green" />
-          ) : (
-            <AntDesign name="check-circle" size={28} color="gray" />
-          )}
-        </TouchableOpacity> */}
       </Swipeable>
     );
   };
@@ -295,9 +285,6 @@ export default function TaskScreen() {
             <Text
               style={[
                 styles.tasksLabel,
-                {
-                  /*color: Colours.warning*/
-                },
               ]}
             >
               Remaining
@@ -402,107 +389,44 @@ export default function TaskScreen() {
         </TouchableOpacity>
       </View>
 
-      <Modal
-        visible={modalVisible}
-        animationType="fade"
-        transparent={true}
-        onRequestClose={() => setModalVisible(false)}
-      >
+      <Modal visible={modalVisible} animationType="fade" transparent={true} onRequestClose={() => setModalVisible(false)}>
         <View style={styles.popup}>
           <View style={styles.popupBox}>
-            <TouchableOpacity
-              style={styles.close}
-              onPress={() => setModalVisible(false)}
-            >
-              <AntDesign
-                name="closecircleo"
-                size={30}
-                color={Colours.defaultText}
-              ></AntDesign>
+            <TouchableOpacity style={styles.close} onPress={() => setModalVisible(false)}>
+              <AntDesign name="close-circle" size={30} color={Colours.defaultText}></AntDesign>
             </TouchableOpacity>
 
             <Text style={styles.popupText}>Create Task</Text>
             <Text style={styles.popupInfo}>Task*</Text>
-            <TextInput
-              style={styles.textInp}
-              placeholder="Complete Project..."
-              placeholderTextColor={Colours.textSecondary}
-              value={taskName}
-              onChangeText={setTaskName}
-            />
+            <TextInput style={styles.textInp} placeholder="Complete Project..." placeholderTextColor={Colours.textSecondary} value={taskName} onChangeText={setTaskName}/>
 
             <View style={styles.DateTimePickers}>
               <View style={styles.popupPicker}>
                 <Text style={styles.popupInfo}>Date*</Text>
-                <TouchableOpacity
-                  style={styles.inpType}
-                  onPress={() => setShowDatePicker(true)}
-                >
+                <TouchableOpacity style={styles.inpType} onPress={() => setShowDatePicker(true)}>
                   <Text>{taskDate.toDateString()}</Text>
                 </TouchableOpacity>
               </View>
 
               <View style={styles.popupPicker}>
                 <Text style={styles.popupInfo}>Time*</Text>
-                <TouchableOpacity
-                  style={styles.inpType}
-                  onPress={() => setShowTimePicker(true)}
-                >
-                  <Text>
-                    {taskTime.toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </Text>
+                <TouchableOpacity style={styles.inpType}onPress={() => setShowTimePicker(true)}>
+                  <Text> {taskTime.toLocaleTimeString([], {hour: "2-digit",minute: "2-digit",})} </Text>
                 </TouchableOpacity>
               </View>
             </View>
 
             <Text style={styles.popupInfo}>Group*</Text>
-            <TextInput
-              style={styles.textInp}
-              placeholder="Group..."
-              placeholderTextColor={Colours.textSecondary}
-              value={taskName}
-              onChangeText={setTaskName}
-            />
+            <TextInput style={styles.textInp} placeholder="Group..." placeholderTextColor={Colours.textSecondary} value={taskName} onChangeText={setTaskName}/>
 
-            <TouchableOpacity
-              style={styles.addButton}
-              onPress={() => addTask(taskName, taskDate, taskTime)}
-            >
+            <TouchableOpacity style={styles.addButton} onPress={() => addTask(taskName, taskDate, taskTime)}>
               <Text style={styles.addText}>Add Task</Text>
-              <AntDesign
-                name="enter"
-                color={Colours.primaryText}
-                size={24}
-              ></AntDesign>
+              <AntDesign name="enter" color={Colours.primaryText} size={24} ></AntDesign>
             </TouchableOpacity>
 
-            {showDatePicker && (
-              <DateTimePicker
-                value={taskDate}
-                mode="date"
-                display="default"
-                onChange={(event, selectedDate) => {
-                  setShowDatePicker(false);
-                  if (selectedDate) setTaskDate(selectedDate);
-                }}
-              />
-            )}
+            {showDatePicker && ( <DateTimePicker value={taskDate} mode="date" display="default" onChange={(event, selectedDate) => {setShowDatePicker(false); if (selectedDate) setTaskDate(selectedDate);}}/>)}
 
-            {showTimePicker && (
-              <DateTimePicker
-                value={taskTime}
-                mode="time"
-                is24Hour={true}
-                display="default"
-                onChange={(event, selectedTime) => {
-                  setShowTimePicker(false);
-                  if (selectedTime) setTaskTime(selectedTime);
-                }}
-              />
-            )}
+            {showTimePicker && ( <DateTimePicker value={taskTime} mode="time" is24Hour={true} display="default" onChange={(event, selectedTime) => { setShowTimePicker(false); if (selectedTime) setTaskTime(selectedTime); }} />)}
           </View>
         </View>
       </Modal>
