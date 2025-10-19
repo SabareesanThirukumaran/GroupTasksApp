@@ -1,13 +1,4 @@
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  FlatList,
-  Modal,
-  TextInput,
-  Dimensions,
-} from "react-native";
+import {View,Text,StyleSheet,TouchableOpacity,FlatList,Modal,TextInput,Dimensions,} from "react-native";
 import { ScrollView, Swipeable } from "react-native-gesture-handler";
 import { Color, Color as Colours } from "../../constants/colors";
 import { AntDesign, Ionicons, FontAwesome } from "@expo/vector-icons";
@@ -237,7 +228,7 @@ export default function TaskScreen() {
       <ScrollView style={{ width: "100%", height: "100%" }}>
 
         <View style={styles.topHeader}>
-          <Ionicons name="checkmark-done-circle-outline" color={Colours.primary} size={40}></Ionicons>
+          <Ionicons name="checkmark-done" color={Colours.primary} size={40}></Ionicons>
           <Text style={styles.topHeaderText}>Tasks</Text>
         </View>
 
@@ -436,81 +427,97 @@ export default function TaskScreen() {
 
 const styles = StyleSheet.create({
   entire: {
-    position: "relative",
     flex: 1,
     backgroundColor: Colours.background,
   },
 
+  // Top Header Section
   topHeader: {
-    backgroundColor: Colours.background,
-    borderBottomColor: "#35353525",
-    borderBottomWidth: 0.75,
-    marginBottom: 20,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "flex-start",
-    padding: 15
+    paddingHorizontal: 20,
+    paddingVertical: 18,
+    backgroundColor: Colours.surface,
+    elevation: 4,
+    borderBottomColor: "#ffffff10",
+    borderBottomWidth: 1,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    zIndex: 10,
+    marginBottom: 2,
   },
 
   topHeaderText: {
     color: Colours.defaultText,
-    fontWeight: 500,
+    fontWeight: "700",
     fontSize: 26,
-    paddingLeft: 10
+    marginLeft: 10,
   },
+
+  // Task Section
 
   header: {
     width: "100%",
     flexDirection: "row",
     justifyContent: "space-around",
     alignItems: "center",
-    paddingVertical: 10,
+    paddingVertical: 14,
+    marginBottom: 6,
     backgroundColor: Colours.background,
-    marginBottom: 10,
   },
 
   taskCounter: {
     flexDirection: "row",
     alignItems: "center",
-    height: "100%",
   },
 
   taskCounterBar: {
     width: 5,
-    height: "75%",
-    borderRadius: 5,
+    height: 45,
+    borderRadius: 4,
     marginRight: 10,
   },
 
   taskCounterDetails: {
-    gap: -10,
+    flexDirection: "column",
+    justifyContent: "center",
   },
 
   taskCounterText: {
-    fontSize: 14,
-    color: Colours.defaultText,
+    fontSize: 13,
+    color: Colours.textSecondary,
+    marginBottom: 2,
   },
 
   taskCount: {
-    margin: 0,
-    padding: 0,
-    lineHeight: 33,
-    fontSize: 32,
+    fontSize: 28,
     color: Colours.defaultText,
+    fontWeight: "700",
   },
 
+  tasks: {
+    width: "100%",
+    paddingHorizontal: 20,
+    paddingBottom: 10,
+    marginTop: 5,
+  },
+  
   taskCard: {
-    minWidth: "100%",
     backgroundColor: Colours.surface,
-    borderRadius: 15,
+    borderRadius: 14,
     borderColor: Colours.surfaceBorder,
     borderWidth: 1,
     padding: 15,
     marginBottom: 12,
-    width: width * 0.85,
     flexDirection: "row",
-    position: "relative",
-    flexWrap: "wrap",
+    alignItems: "flex-start",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
 
   taskCardMainContent: {
@@ -520,103 +527,104 @@ const styles = StyleSheet.create({
   },
 
   taskCardGroupIndicator: {
-    width: 5,
+    width: 4,
     height: "100%",
-    backgroundColor: Colours.success,
     borderRadius: 10,
-    marginRight: 10,
+    marginRight: 12,
   },
 
   taskCardDetails: {
-    flexDirection: "column",
-    paddingVertical: 2,
+    flex: 1,
   },
 
   taskCardName: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: "700",
     color: Colours.defaultText,
-    marginRight: 10,
-    flexShrink: 1,
+    marginBottom: 2,
   },
 
   taskCardDescription: {
-    fontSize: 13,
-    color: Colours.grayText,
+    fontSize: 13.5,
+    color: Colours.textSecondary,
   },
 
   taskDifficultyContainer: {
     position: "absolute",
-    bottom: 10,
-    right: 10,
+    top: 12,
+    right: 12,
     backgroundColor: Colours.background,
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 50,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: Colours.surfaceBorder,
   },
-
-  tasks: {
-    width: "100%",
-    height: "auto",
-    padding: 20,
-    paddingBottom: 0,
-    paddingTop: 5,
-  },
+  
   tasksLabelContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: 5,
+    paddingVertical: 6,
   },
+
   tasksLabelOptionsContainer: {
     flexDirection: "row",
+    alignItems: "center",
     gap: 10,
   },
+
   tasksLabelFilterButton: {
-    padding: 5,
+    padding: 6,
+    borderRadius: 8,
   },
+
   tasksSearchContainer: {
     backgroundColor: Colours.surface,
     borderColor: Colours.surfaceBorder,
     borderWidth: 1,
-    borderRadius: 50,
-    width: 150,
+    borderRadius: 10,
+    width: 160,
     paddingHorizontal: 10,
-    height: 42,
+    height: 45,
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
+    gap: 6,
   },
 
   tasksLabel: {
-    fontSize: 18,
+    fontSize: 19,
     color: Colours.defaultText,
+    fontWeight: "600",
   },
 
   deleteButton: {
-      backgroundColor: "#d50000d9",
-      justifyContent: "center",
-      alignItems: "center",
-      width: 70,
-      borderRadius: 15,
-      height: "88%",
+    backgroundColor: "#e53935",
+    justifyContent: "center",
+    alignItems: "center",
+    width: 65,
+    borderRadius: 15,
+    height: "85%",
   },
 
   completeButton: {
-      backgroundColor: "#3dd68cd9",
-      justifyContent: "center",
-      alignItems: "center",
-      width: 70,
-      borderRadius: 15,
-      height: "88%"
+    backgroundColor: "#43a047",
+    justifyContent: "center",
+    alignItems: "center",
+    width: 65,
+    borderRadius: 15,
+    height: "85%",
   },
 
   addTask: {
     minWidth: "100%",
     position: "absolute",
     bottom: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 5,
+    elevation: 4,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -624,9 +632,9 @@ const styles = StyleSheet.create({
   addBar: {
     justifyContent: "center",
     alignItems: "center",
-    width: 75,
-    height: 75,
-    borderRadius: 37.5,
+    width: 70,
+    height: 70,
+    borderRadius: 35,
     backgroundColor: Colours.primary,
   },
 

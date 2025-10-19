@@ -1,5 +1,5 @@
 import React, {useEffect, useRef, useState} from "react";
-import { View, StyleSheet, Dimensions, Text, FlatList, TouchableOpacity, Modal, TextInput, Animated } from "react-native";
+import { View, StyleSheet, Dimensions, Text, FlatList, TouchableOpacity, Modal, TextInput } from "react-native";
 import { ScrollView, Swipeable } from "react-native-gesture-handler";
 import Svg, { Path, G, Circle} from "react-native-svg";
 import { Color as Colours } from "../../constants/colors";
@@ -18,9 +18,9 @@ export default function home() {
     { id: '4', title: 'Task 4', dueDate: '2024-06-15', difficulty: 'Hard' },
   ]);
   const [groups, setGroups] = useState([
-    {id: 1, name: "Study Group", members: 23, colour: Colours.groupColours[0], icon: "book"},
-    {id: 2, name: "Dorm Group", members: 5, colour: Colours.groupColours[2], icon: "people-sharp"},
-    {id: 3, name: "Study Group", members: 23, colour: Colours.groupColours[0], icon: "book"},
+    {id: 1, name: "Study Group", members: 23, colour: Colours.groupColours[0], icon: "book", tasksDone: 15, percent: 65, tasks:23},
+    {id: 2, name: "Dorm Group", members: 5, colour: Colours.groupColours[2], icon: "people-sharp", tasksDone: 15, percent: 65, tasks:23},
+    {id: 3, name: "Study Group", members: 23, colour: Colours.groupColours[0], icon: "book", tasksDone: 15, percent: 65, tasks:23},
   ]);
 
   const [showAddTaskModal, setShowAddTaskModal] = useState(false);
@@ -47,7 +47,9 @@ export default function home() {
     { name: "Science Club", percent: 20 },
     { name: "Chess Club", percent: 50 },
   ];
-  const animatedValue = useRef(new Animated.Value(0)).current;
+
+  const [showRecentGroup, setShowRecentGroup] = useState(false);
+  const [selectedGroup, setSelectedGroup] = useState(null);
 
 
   let renderTask = (task, index) => {
@@ -88,14 +90,14 @@ export default function home() {
     const isLast = index === 1;
 
     return (
-      <View key={group.id} style={styles.groupCard}>
+      <TouchableOpacity key={group.id} style={styles.groupCard} onPress={() => {setShowRecentGroup(true); setSelectedGroup(group)}}>
 
         <View style={[styles.groupMain, {backgroundColor: group.colour}]}>
           <Ionicons name={group.icon} size={24} color={"#fff"}></Ionicons>
         </View>
         <Text style={styles.groupText}>{group.name}</Text>
 
-      </View>
+      </TouchableOpacity>
     )
   }
 
@@ -386,6 +388,50 @@ export default function home() {
 
         </View>
       </View>
+      </Modal>
+
+      <Modal transparent={true} animationType="fade" visible={showRecentGroup} onRequestClose={() => setShowRecentGroup(false)}>
+          <View style={styles.overlay}>
+            <View style={styles.modalBox}>
+
+              <TouchableOpacity style={styles.close} onPress={() => setShowRecentGroup(false)}>
+                <AntDesign name="close-circle" size={28} color="white" />
+              </TouchableOpacity>
+
+              {selectedGroup && (
+                <>
+                  <View style={{ alignItems: "center", marginBottom: 15 }}>
+                    <View style={[styles.groupIconWrapper, { backgroundColor: selectedGroup.colour }]}>
+                      <Ionicons name={selectedGroup.icon} size={24} color="#fff" />
+                    </View>
+                    <Text style={styles.groupName}>{selectedGroup.name}</Text>
+                    <Text style={styles.groupMembersText}>
+                      {selectedGroup.members} Members
+                    </Text>
+                  </View>
+
+                  <View style={styles.statsRow}>
+                    <View style={styles.statsCard}>
+                      <Ionicons name="people-outline" size={24} color="#0F6EC6" />
+                      <Text style={styles.statsCardTitle}>Active Members</Text>
+                      <Text style={styles.castatsCardValuerdValue}>{selectedGroup.members}</Text>
+                    </View>
+                    <View style={styles.statsCard}>
+                      <Ionicons name="checkmark-done-circle-outline" size={24} color="#43A047" />
+                      <Text style={styles.statsCardTitle}>Tasks Done</Text>
+                      <Text style={styles.statsCardValue}>{selectedGroup.percent}%</Text>
+                    </View>
+                  </View>
+
+                  <TouchableOpacity style={styles.leaveButton} onPress={() => leaveGroup(groupId)}>
+                    <Text style={styles.leaveButtonText}>Leave</Text>
+                    <Ionicons name="log-out-outline" color="white" size={22} />
+                  </TouchableOpacity>
+                </>
+              )}
+
+            </View>
+          </View>
       </Modal>
 
     </View>
@@ -1082,5 +1128,132 @@ const styles = StyleSheet.create({
     backgroundColor: "#0F6EC6",
     borderRadius: 6,
   },
+  
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.35)",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 20,
+  },
+
+  modalBox: {
+    width: "100%",
+    maxWidth: 350,
+    backgroundColor: "#fff",
+    borderRadius: 25,
+    paddingVertical: 25,
+    paddingHorizontal: 20,
+    elevation: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    position: "relative",
+  },
+
+  close: {
+    position: "absolute",
+    top: 15,
+    right: 15,
+    backgroundColor: "#0F6EC6",
+    borderRadius: 20,
+    width: 36,
+    height: 36,
+    justifyContent: "center",
+    alignItems: "center",
+    elevation: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+  },
+
+  groupIconWrapper: {
+    width: 60,
+    height: 60,
+    borderRadius: 18,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 12,
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+
+  groupName: {
+    fontWeight: "800",
+    fontSize: 20,
+    color: "#111",
+    textAlign: "center",
+    marginBottom: 5,
+  },
+
+  groupMembersText: {
+    fontSize: 14,
+    color: "#666",
+    textAlign: "center",
+  },
+
+  statsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginVertical: 12,
+  },
+
+  statsCard: {
+    flex: 1,
+    backgroundColor: "#F5F5F5",
+    paddingVertical: 15,
+    paddingHorizontal: 10,
+    borderRadius: 18,
+    alignItems: "center",
+    marginHorizontal: 5,
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+  },
+
+  statsCardTitle: {
+    fontWeight: "600",
+    fontSize: 14,
+    color: "#333",
+    marginTop: 5,
+    textAlign: "center",
+  },
+
+  statsCardValue: {
+    fontWeight: "700",
+    fontSize: 18,
+    marginTop: 5,
+    color: "#111",
+  },
+
+  leaveButton: {
+    marginTop: 15,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#E53935",
+    paddingVertical: 14,
+    borderRadius: 14,
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+  },
+
+  leaveButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "700",
+    marginRight: 8,
+  },
+
 
 });

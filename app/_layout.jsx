@@ -12,12 +12,10 @@ export default function index() {
           paddingTop: 18,
         },
 
-        // tabBarLabelStyle: { display: "none" },
         tabBarHideOnKeyboard: true,
         unmountOnBlur: true,
         freezeOnBlur: false,
         lazy: false,
-        // animation: "none",
       }}
       initialRouteName="home"
     >
