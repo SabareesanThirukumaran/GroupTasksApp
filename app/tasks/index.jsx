@@ -1,5 +1,5 @@
 import {View,Text,StyleSheet,TouchableOpacity,FlatList,Modal,TextInput,Dimensions,} from "react-native";
-import { ScrollView, Swipeable } from "react-native-gesture-handler";
+import { ScrollView, Swipeable, Switch } from "react-native-gesture-handler";
 import { Color, Color as Colours } from "../../constants/colors";
 import { AntDesign, Ionicons, FontAwesome } from "@expo/vector-icons";
 import React, { useEffect, useRef, useState } from "react";
@@ -10,38 +10,29 @@ const width = Dimensions.get("window").width;
 
 export default function TaskScreen() {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [modalVisible, setModalVisible] = useState(false);
+  const [tasks, setTasks] = useState([
+    { id: '1', title: 'Task 1', dueDate: '2024-06-10', difficulty: 'Easy', description: "Hello my name is", groupId: 1 },
+    { id: '2', title: 'Task 2', dueDate: '2024-06-12',  difficulty: 'Medium', description: "Hello my name is", groupId: 1 },
+    { id: '3', title: 'Task 3', dueDate: '2024-06-15', difficulty: 'Hard', description: "Hello my name is", groupId: 3 },
+    { id: '4', title: 'Task 4', dueDate: '2024-06-15', difficulty: 'Hard', description: "Hello my name is", groupId: 2 },
+  ]);
+  const [groups, setGroups] = useState([
+    {id: 1, name: "Study Group", members: 23, colour: Colours.groupColours[0], icon: "book", tasksDone: 15, percent: 65, tasks:23},
+    {id: 2, name: "Dorm Group", members: 5, colour: Colours.groupColours[2], icon: "people-sharp", tasksDone: 15, percent: 65, tasks:23},
+    {id: 3, name: "Study Group", members: 23, colour: Colours.groupColours[0], icon: "book", tasksDone: 15, percent: 65, tasks:23},
+  ]);
+
+  const [showAddTaskModal, setShowAddTaskModal] = useState(false);
   const [taskName, setTaskName] = useState("");
   const [taskDate, setTaskDate] = useState(new Date());
   const [taskTime, setTaskTime] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
-  const [tasks, setTasks] = useState([
-    {
-      id: "1",
-      name: "Finish React Native project",
-      description: "Complete the UI and functionality",
-      difficulty: "Hard",
-      localGroupId: 1,
-      completed: true,
-    },
-    {
-      id: "2",
-      name: "Study Physics notes",
-      description: "Review chapters 4 and 5",
-      difficulty: "Easy",
-      localGroupId: 0,
-      completed: false,
-    },
-    {
-      id: "3",
-      name: "Grocery shopping",
-      description: "Buy ingredients for dinner",
-      difficulty: "Medium",
-      localGroupId: 0,
-      completed: false,
-    },
-  ]);
+  const [taskDescription, setTaskDescription] = useState("");
+  const [difficulty, setDifficulty] = useState("Easy");
+  const [hasDueDate, setHasDueDate] = useState(false);
+  const [selectedGroupT, setSelectedGroupT] = useState(null);
+  
   const [remainingSearchValue, setRemainingSearchValue] = useState("");
   const remainingFuse = new Fuse(
     tasks.filter((task) => !task.completed),
@@ -50,10 +41,10 @@ export default function TaskScreen() {
       keys: ["name", "description", "difficulty"],
     }
   );
-  // const remainingFilteredIds = useRef([]);
   const [remainingTasks, setRemainingTasks] = useState(
     tasks.filter((task) => !task.completed)
   );
+
   const onRemainingChangeSearch = (newValue) => {
     setRemainingSearchValue(newValue);
     setRemainingTasks(tasks.filter((task) => !task.completed));
@@ -72,7 +63,7 @@ export default function TaskScreen() {
       keys: ["name", "description", "difficulty"],
     }
   );
-  // const completedFilteredIds = useRef([]);
+
   const [completedTasks, setCompletedTasks] = useState(
     tasks.filter((task) => task.completed)
   );
@@ -90,6 +81,7 @@ export default function TaskScreen() {
     onCompletedChangeSearch(completedSearchValue);
     onRemainingChangeSearch(remainingSearchValue);
   }, [tasks]);
+  
   const formattedDate = currentDate.toLocaleDateString("en-GB", {
     weekday: "short",
     day: "numeric",
@@ -154,9 +146,6 @@ export default function TaskScreen() {
       <Swipeable
         key={task.id}
         renderRightActions={() => renderRightActions(task)}
-        onSwipeableOpen={(dir) => {
-          // if (dir === "right") toggleComplete(task.id);
-        }}
         childrenContainerStyle={styles.taskCard}
         containerStyle={{
           width: "100%",
@@ -165,7 +154,7 @@ export default function TaskScreen() {
         <View
           style={[
             styles.taskCardGroupIndicator,
-            { backgroundColor: Colours.groupColours[task.localGroupId] },
+            { backgroundColor: groups.find((group) => group.id === task.groupId)?.colour || Colours.defaultText},
           ]}
         />
         <View style={styles.taskCardMainContent}>
@@ -175,7 +164,7 @@ export default function TaskScreen() {
               numberOfLines={1}
               ellipsizeMode="tail"
             >
-              {task.name}
+              {task.title}
             </Text>
             <Text style={styles.taskCardDescription}>{task.description}</Text>
           </View>
@@ -190,10 +179,6 @@ export default function TaskScreen() {
         </View>
       </Swipeable>
     );
-  };
-
-  const showModal = () => {
-    setModalVisible(true);
   };
 
   const addTask = (taskSelected, dateSelected, timeSelected) => {
@@ -371,7 +356,7 @@ export default function TaskScreen() {
       </ScrollView>
 
       <View style={styles.addTask}>
-        <TouchableOpacity style={styles.addBar} onPress={showModal}>
+        <TouchableOpacity style={styles.addBar} onPress={() => setShowAddTaskModal(true)}>
           <AntDesign
             name="plus"
             size={45}
@@ -380,43 +365,70 @@ export default function TaskScreen() {
         </TouchableOpacity>
       </View>
 
-      <Modal visible={modalVisible} animationType="fade" transparent={true} onRequestClose={() => setModalVisible(false)}>
+      <Modal visible={showAddTaskModal} animationType="fade" transparent={true} onRequestClose={() => setShowAddTaskModal(false)}>
         <View style={styles.popup}>
           <View style={styles.popupBox}>
-            <TouchableOpacity style={styles.close} onPress={() => setModalVisible(false)}>
-              <AntDesign name="close-circle" size={30} color={Colours.defaultText}></AntDesign>
+            <TouchableOpacity style={styles.close} onPress={() => setShowAddTaskModal(false)}>
+              <AntDesign name="close-circle" size={30} color="white"></AntDesign>
             </TouchableOpacity>
 
             <Text style={styles.popupText}>Create Task</Text>
+
+
             <Text style={styles.popupInfo}>Task*</Text>
             <TextInput style={styles.textInp} placeholder="Complete Project..." placeholderTextColor={Colours.textSecondary} value={taskName} onChangeText={setTaskName}/>
 
-            <View style={styles.DateTimePickers}>
-              <View style={styles.popupPicker}>
-                <Text style={styles.popupInfo}>Date*</Text>
-                <TouchableOpacity style={styles.inpType} onPress={() => setShowDatePicker(true)}>
-                  <Text>{taskDate.toDateString()}</Text>
-                </TouchableOpacity>
-              </View>
+            <View style={{ flexDirection: "row", alignItems: "center", marginVertical: 10 }}>
+              <Switch value={hasDueDate} onValueChange={setHasDueDate} thumbColor={hasDueDate ? Colours.primary : "#ccc"} trackColor={{ false: "#aaa", true: Colours.primary }}/>
+              <Text style={{ marginLeft: 10, color: Colours.defaultText, fontWeight: "600" }}>Add a due date?</Text>
+            </View>
 
-              <View style={styles.popupPicker}>
-                <Text style={styles.popupInfo}>Time*</Text>
-                <TouchableOpacity style={styles.inpType}onPress={() => setShowTimePicker(true)}>
-                  <Text> {taskTime.toLocaleTimeString([], {hour: "2-digit",minute: "2-digit",})} </Text>
-                </TouchableOpacity>
+            {hasDueDate && (
+              <View style={styles.DateTimePickers}>
+                <View style={styles.popupPicker}>
+                  <Text style={styles.popupInfo}>Date*</Text>
+                  <TouchableOpacity style={styles.inpType} onPress={() => setShowDatePicker(true)}>
+                    <Text>{taskDate.toDateString()}</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.popupPicker}>
+                  <Text style={styles.popupInfo}>Time*</Text>
+                  <TouchableOpacity style={styles.inpType} onPress={() => setShowTimePicker(true)}>
+                    <Text>
+                      {taskTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               </View>
+            )}
+
+            <Text style={styles.popupInfo}>Difficulty</Text>
+            <View style={styles.pill}>
+              {['Easy', 'Medium', 'Hard'].map((level) => (
+                <TouchableOpacity key={level} style={[styles.pillButton, difficulty === level && styles.activeButton]} onPress={() => setDifficulty(level)}>
+                  <Text style={[styles.pillText, difficulty === level && styles.activeText]}>{level}</Text>
+                </TouchableOpacity>
+              ))}
             </View>
 
             <Text style={styles.popupInfo}>Group*</Text>
-            <TextInput style={styles.textInp} placeholder="Group..." placeholderTextColor={Colours.textSecondary} value={taskName} onChangeText={setTaskName}/>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginVertical: 10}}>
+              {groups.map((group) => (
+                <TouchableOpacity key={group.id} style={[styles.iconOption, selectedGroupT?.id === group.id && styles.iconSelected, {backgroundColor: group.colour}, ]} onPress={() => setSelectedGroupT(group)}>
+                  <Ionicons name={group.icon} size={26} color="white"></Ionicons>
+                </TouchableOpacity>))}
+            </ScrollView>
 
-            <TouchableOpacity style={styles.addButton} onPress={() => addTask(taskName, taskDate, taskTime)}>
+            <Text style={styles.popupInfo}>Description</Text>
+            <TextInput style={[styles.textInp, { height: 80, textAlignVertical: "top" }]} placeholder="Add more details..." placeholderTextColor={Colours.textSecondary} value={taskDescription} onChangeText={setTaskDescription}multiline/>
+
+            <TouchableOpacity style={styles.addButton} onPress={() => addTask(taskName, hasDueDate ? taskDate : null, hasDueDate ? taskTime : null, difficulty, selectedGroup, taskDescription)}>
               <Text style={styles.addText}>Add Task</Text>
-              <AntDesign name="enter" color={Colours.primaryText} size={24} ></AntDesign>
+              <AntDesign name="enter" color={Colours.primaryText} size={24} />
             </TouchableOpacity>
 
             {showDatePicker && ( <DateTimePicker value={taskDate} mode="date" display="default" onChange={(event, selectedDate) => {setShowDatePicker(false); if (selectedDate) setTaskDate(selectedDate);}}/>)}
-
             {showTimePicker && ( <DateTimePicker value={taskTime} mode="time" is24Hour={true} display="default" onChange={(event, selectedTime) => { setShowTimePicker(false); if (selectedTime) setTaskTime(selectedTime); }} />)}
           </View>
         </View>
@@ -616,6 +628,8 @@ const styles = StyleSheet.create({
     height: "85%",
   },
 
+  // POPUP STYLES
+
   addTask: {
     minWidth: "100%",
     position: "absolute",
@@ -632,9 +646,9 @@ const styles = StyleSheet.create({
   addBar: {
     justifyContent: "center",
     alignItems: "center",
-    width: 70,
-    height: 70,
-    borderRadius: 35,
+    width: 75,
+    height: 75,
+    borderRadius: 37.5,
     backgroundColor: Colours.primary,
   },
 
@@ -642,126 +656,188 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backgroundColor: "rgba(0, 0, 0, 0.4)",
+    paddingHorizontal: 25,
   },
 
   popupBox: {
-    width: 300,
-    padding: 20,
-    borderRadius: 10,
-    backgroundColor: Colours.background,
-    elevation: 5,
+    width: "100%",
+    maxWidth: 340,
+    backgroundColor: Colours.surface,
+    borderRadius: 20,
+    padding: 25,
+    elevation: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
     position: "relative",
   },
 
   close: {
     position: "absolute",
-    top: -10,
-    right: -10,
-    backgroundColor: Colours.grayText,
-    borderRadius: 15,
+    top:12,
+    right: 12,
+    backgroundColor: "#0F6EC6",
+    borderRadius: 20,
+    width: 34,
+    height: 34,
+    justifyContent: "center",
+    alignItems: "center",
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowOffset: { width: 0, height: 2 },
   },
 
   popupText: {
-    fontWeight: 800,
-    fontSize: 20,
+    fontWeight: "800",
+    fontSize: 22,
+    color: Colours.defaultText,
+    textAlign: "center",
     marginBottom: 20,
   },
 
   popupInfo: {
-    color: Colours.textSecondary,
-    fontWeight: 500,
+    color: Colours.grayText,
+    fontWeight: "600",
+    marginBottom: 5,
+    marginTop: 10,
   },
 
   textInp: {
     width: "100%",
     height: 50,
-    backgroundColor: Colours.background,
+    backgroundColor: Colours.surface,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#ccc",
+    borderColor: "#e0e0e0",
     paddingHorizontal: 15,
     fontSize: 16,
-    color: "#333",
-    shadowColor: "#474747ff",
+    color: Colours.defaultText,
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 2,
-    elevation: 2,
-    marginVertical: 5,
+    elevation: 1,
   },
 
   DateTimePickers: {
     width: "100%",
     flexDirection: "row",
     justifyContent: "space-between",
+    marginTop: 10,
   },
 
   popupPicker: {
-    flexDirection: "column",
+    flex: 1,
+    marginHorizontal: 5,
   },
 
   inpType: {
-    width: "100%",
-    backgroundColor: Colours.background,
-    height: 45,
+    backgroundColor: Colours.surface,
+    height: 50,
     borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 8,
+    borderColor: "#e0e0e0",
+    borderRadius: 10,
     justifyContent: "center",
-    paddingHorizontal: 10,
-    marginTop: 10,
-    marginBottom: 10,
+    paddingHorizontal: 15,
   },
 
   addButton: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: Colours.primary,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 10,
-    marginTop: 15,
+    backgroundColor: "#0F6EC6",
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginTop: 25,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
     shadowRadius: 4,
-    elevation: 3,
+    elevation: 4,
   },
 
   addText: {
-    color: Colours.primaryText,
-    fontSize: 16,
-    fontWeight: "900",
+    color: "white",
+    fontSize: 17,
+    fontWeight: "700",
     marginRight: 10,
   },
 
   pill: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center"
+    justifyContent: "space-between"
   },
 
-  leftButton: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    backgroundColor: Colours.primary,
-    borderTopLeftRadius: 25,
-    borderBottomLeftRadius: 25,
-    justifyContent: "center",
+  pillButton: {
+    flex: 1,
+    paddingVertical: 10,
+    marginHorizontal: 5,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: Colours.secondary,
     alignItems: "center",
-    marginHorizontal: 10,
+    backgroundColor: "#f8f8f8",
   },
 
-  rightButton: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+  activeButton: {
     backgroundColor: Colours.primary,
-    borderTopRightRadius: 25,
-    borderBottomRightRadius: 25,
+    borderColor: Colours.primary,
+  },
+
+  pillText: {
+    color: Colours.secondaryText,
+    fontWeight: "600",
+  },
+
+  activeText: {
+    color: "white",
+  },
+
+  iconOption: {
+    width: 55,
+    height: 55,
+    borderRadius: 15,
+    borderWidth: 1,
+    borderColor: "#ddd",
+    backgroundColor: Colours.surface,
     justifyContent: "center",
     alignItems: "center",
-    marginHorizontal: 10,
+    marginRight: 10,
+    elevation: 1,
   },
+
+  iconSelected: {
+    backgroundColor: "#0F6EC6",
+    borderColor: "#0F6EC6",
+    elevation: 4,
+  },
+
+  pill: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 10,
+  },
+
+
+  pillText: {
+    fontWeight: "600",
+    color: Colours.defaultText,
+  },
+
+  activeButton: {
+    backgroundColor: "#0F6EC6",
+  },
+
+  selectedColorBorder: {
+    borderColor: "#0F6EC6",
+    transform: [{ scale: 1.1 }],
+    elevation: 3,
+  },
+
+
 });

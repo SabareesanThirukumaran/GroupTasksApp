@@ -2,8 +2,8 @@ import {View,Text,StyleSheet,TouchableOpacity,FlatList,Modal,TextInput,Dimension
 import { ScrollView, Swipeable } from "react-native-gesture-handler";
 import { Color as Colours } from "../../constants/colors";
 import { AntDesign, Ionicons, FontAwesome } from "@expo/vector-icons";
-import React, { useEffect, useRef, useState } from "react";
-import DateTimePicker from "@react-native-community/datetimepicker";
+import React, { useEffect, useState } from "react";
+import Fuse from "fuse.js";
 
 const width = Dimensions.get("window").width;
 const height = Dimensions.get("window").height;
@@ -53,9 +53,33 @@ export default function GroupScreen() {
     </TouchableOpacity>)
   }
 
+  const [groupSearchValue, setGroupSearchValue] = useState("")
+  const groupFuse = new Fuse(
+    groups,
+    {
+      keys: ["name"]
+    }
+  )
+  const [groupsRem, setGroupsRem] = useState(
+    groups
+  )
+  const onGroupChangeSearch = (newValue) => {
+    setGroupSearchValue(newValue);
+    if (newValue.trim() === "") {
+      setGroupsRem(groups);
+      return;
+    }
+    let fuseSearchResults = groupFuse.search(newValue);
+    setGroupsRem(fuseSearchResults.map(({item}) => item));
+  }
+
+  useEffect(() => {
+    onGroupChangeSearch(groupSearchValue)
+  }, [groups])
+
   return (
     <View style={styles.entire}>
-      <FlatList data={groups} renderItem={renderGroup} keyExtractor={(item) => item.id.toString()} contentContainerStyle={{paddingBottom: 20}} ListHeaderComponent={
+      <FlatList data={groupsRem} renderItem={renderGroup} keyExtractor={(item) => item.id.toString()} contentContainerStyle={{paddingBottom: 20}} ListHeaderComponent={
         <View>
 
           <View style={styles.topHeader}>
@@ -66,7 +90,7 @@ export default function GroupScreen() {
           <View style={styles.searchItems}>
             <View style={styles.tasksSearchContainer}>
               <FontAwesome name="search" size={18} color={Colours.defaultText} />
-              <TextInput placeholder="Find a Group" style={{fontSize: 16, flex: 1, paddingVertical: 0}}/>
+              <TextInput placeholder="Find a Group" style={{fontSize: 16, flex: 1, paddingVertical: 0}} onChangeText={onGroupChangeSearch}/>
             </View>
 
             <TouchableOpacity style={styles.createGroup} onPress={() => setShowAddGroupModal(true)}>
@@ -93,7 +117,7 @@ export default function GroupScreen() {
                 </TouchableOpacity>
 
                 <View style={{ alignItems: "center" }}>
-                  <Ionicons name="people-circle" size={60} color={Colours.primary} style={{ marginBottom: 6 }}/>
+                  <Ionicons name={selectedGroup.icon} size={50} color="#fff" style={[{ marginBottom: 6 }, {backgroundColor: selectedGroup.colour}, {padding: 10}, {borderRadius: 16}]}/>
                   <Text style={styles.modalHeaderText}>{selectedGroup.name}</Text>
                   <Text style={styles.modalSubHeaderText}>{selectedGroup.members} Members</Text>
                 </View>
@@ -103,9 +127,9 @@ export default function GroupScreen() {
               <View style={styles.progressCard}>
                 <Text style={styles.progressTitle}>Overall Progress</Text>
                 <View style={styles.progressBar}>
-                  <View style={[styles.progressFill, { width: "45%" }]} />
+                  <View style={[styles.progressFill, { width: `${selectedGroup.percent}%` }]} />
                 </View>
-                <Text style={styles.progressPercent}>45% Completed</Text>
+                <Text style={styles.progressPercent}>{selectedGroup.percent}% Completed</Text>
               </View>
 
               <View style={styles.modalTasks}>

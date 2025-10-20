@@ -1,6 +1,6 @@
 import React, {useEffect, useRef, useState} from "react";
 import { View, StyleSheet, Dimensions, Text, FlatList, TouchableOpacity, Modal, TextInput } from "react-native";
-import { ScrollView, Swipeable } from "react-native-gesture-handler";
+import { ScrollView, Swipeable, Switch } from "react-native-gesture-handler";
 import Svg, { Path, G, Circle} from "react-native-svg";
 import { Color as Colours } from "../../constants/colors";
 import { AntDesign, FontAwesome, Ionicons } from "@expo/vector-icons";
@@ -12,10 +12,10 @@ const height = Dimensions.get("window").height;
 
 export default function home() {
   const [tasks, setTasks] = useState([
-    { id: '1', title: 'Task 1', dueDate: '2024-06-10', difficulty: 'Easy' },
-    { id: '2', title: 'Task 2', dueDate: '2024-06-12',  difficulty: 'Medium' },
-    { id: '3', title: 'Task 3', dueDate: '2024-06-15', difficulty: 'Hard' },
-    { id: '4', title: 'Task 4', dueDate: '2024-06-15', difficulty: 'Hard' },
+    { id: '1', title: 'Task 1', dueDate: '2024-06-10', difficulty: 'Easy', description: "" },
+    { id: '2', title: 'Task 2', dueDate: '2024-06-12',  difficulty: 'Medium', description: "" },
+    { id: '3', title: 'Task 3', dueDate: '2024-06-15', difficulty: 'Hard', description: "" },
+    { id: '4', title: 'Task 4', dueDate: '2024-06-15', difficulty: 'Hard', description: "" },
   ]);
   const [groups, setGroups] = useState([
     {id: 1, name: "Study Group", members: 23, colour: Colours.groupColours[0], icon: "book", tasksDone: 15, percent: 65, tasks:23},
@@ -29,6 +29,10 @@ export default function home() {
   const [taskTime, setTaskTime] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
+  const [taskDescription, setTaskDescription] = useState("");
+  const [difficulty, setDifficulty] = useState("Easy");
+  const [hasDueDate, setHasDueDate] = useState(false);
+  const [selectedGroupT, setSelectedGroupT] = useState(null);
   
   const [showAddGroupModal, setShowAddGroupModal] = useState(false);
   const [groupName, setGroupName] = useState("");
@@ -237,31 +241,59 @@ export default function home() {
             </TouchableOpacity>
 
             <Text style={styles.popupText}>Create Task</Text>
+
+
             <Text style={styles.popupInfo}>Task*</Text>
             <TextInput style={styles.textInp} placeholder="Complete Project..." placeholderTextColor={Colours.textSecondary} value={taskName} onChangeText={setTaskName}/>
 
-            <View style={styles.DateTimePickers}>
-              <View style={styles.popupPicker}>
-                <Text style={styles.popupInfo}>Date*</Text>
-                <TouchableOpacity style={styles.inpType} onPress={() => setShowDatePicker(true)}>
-                  <Text>{taskDate.toDateString()}</Text>
-                </TouchableOpacity>
-              </View>
+            <View style={{ flexDirection: "row", alignItems: "center", marginVertical: 10 }}>
+              <Switch value={hasDueDate} onValueChange={setHasDueDate} thumbColor={hasDueDate ? Colours.primary : "#ccc"} trackColor={{ false: "#aaa", true: Colours.primary }}/>
+              <Text style={{ marginLeft: 10, color: Colours.defaultText, fontWeight: "600" }}>Add a due date?</Text>
+            </View>
 
-              <View style={styles.popupPicker}>
-                <Text style={styles.popupInfo}>Time*</Text>
-                <TouchableOpacity style={styles.inpType}onPress={() => setShowTimePicker(true)}>
-                  <Text> {taskTime.toLocaleTimeString([], {hour: "2-digit",minute: "2-digit",})} </Text>
-                </TouchableOpacity>
+            {hasDueDate && (
+              <View style={styles.DateTimePickers}>
+                <View style={styles.popupPicker}>
+                  <Text style={styles.popupInfo}>Date*</Text>
+                  <TouchableOpacity style={styles.inpType} onPress={() => setShowDatePicker(true)}>
+                    <Text>{taskDate.toDateString()}</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.popupPicker}>
+                  <Text style={styles.popupInfo}>Time*</Text>
+                  <TouchableOpacity style={styles.inpType} onPress={() => setShowTimePicker(true)}>
+                    <Text>
+                      {taskTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               </View>
+            )}
+
+            <Text style={styles.popupInfo}>Difficulty</Text>
+            <View style={styles.pill}>
+              {['Easy', 'Medium', 'Hard'].map((level) => (
+                <TouchableOpacity key={level} style={[styles.pillButton, difficulty === level && styles.activeButton]} onPress={() => setDifficulty(level)}>
+                  <Text style={[styles.pillText, difficulty === level && styles.activeText]}>{level}</Text>
+                </TouchableOpacity>
+              ))}
             </View>
 
             <Text style={styles.popupInfo}>Group*</Text>
-            <TextInput style={styles.textInp} placeholder="Group..." placeholderTextColor={Colours.textSecondary} value={taskName} onChangeText={setTaskName}/>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginVertical: 10}}>
+              {groups.map((group) => (
+                <TouchableOpacity key={group.id} style={[styles.iconOption, selectedGroupT?.id === group.id && styles.iconSelected, {backgroundColor: group.colour}, ]} onPress={() => setSelectedGroupT(group)}>
+                  <Ionicons name={group.icon} size={26} color="white"></Ionicons>
+                </TouchableOpacity>))}
+            </ScrollView>
 
-            <TouchableOpacity style={styles.addButton} onPress={() => addTask(taskName, taskDate, taskTime)}>
+            <Text style={styles.popupInfo}>Description</Text>
+            <TextInput style={[styles.textInp, { height: 80, textAlignVertical: "top" }]} placeholder="Add more details..." placeholderTextColor={Colours.textSecondary} value={taskDescription} onChangeText={setTaskDescription}multiline/>
+
+            <TouchableOpacity style={styles.addButton} onPress={() => addTask(taskName, hasDueDate ? taskDate : null, hasDueDate ? taskTime : null, difficulty, selectedGroup, taskDescription)}>
               <Text style={styles.addText}>Add Task</Text>
-              <AntDesign name="enter" color={Colours.primaryText} size={24} ></AntDesign>
+              <AntDesign name="enter" color={Colours.primaryText} size={24} />
             </TouchableOpacity>
 
             {showDatePicker && ( <DateTimePicker value={taskDate} mode="date" display="default" onChange={(event, selectedDate) => {setShowDatePicker(false); if (selectedDate) setTaskDate(selectedDate);}}/>)}
@@ -836,7 +868,7 @@ const styles = StyleSheet.create({
 
   close: {
     position: "absolute",
-    top: 12,
+    top:12,
     right: 12,
     backgroundColor: "#0F6EC6",
     borderRadius: 20,
@@ -929,8 +961,35 @@ const styles = StyleSheet.create({
   pill: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center"
+    justifyContent: "space-between"
   },
+
+  pillButton: {
+    flex: 1,
+    paddingVertical: 10,
+    marginHorizontal: 5,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: Colours.secondary,
+    alignItems: "center",
+    backgroundColor: "#f8f8f8",
+  },
+
+  activeButton: {
+    backgroundColor: Colours.primary,
+    borderColor: Colours.primary,
+  },
+
+  pillText: {
+    color: Colours.secondaryText,
+    fontWeight: "600",
+  },
+
+  activeText: {
+    color: "white",
+  },
+
+  // Group MODAL
 
   leftButton: {
     paddingHorizontal: 10,
@@ -1150,23 +1209,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 12,
     position: "relative",
-  },
-
-  close: {
-    position: "absolute",
-    top: 15,
-    right: 15,
-    backgroundColor: "#0F6EC6",
-    borderRadius: 20,
-    width: 36,
-    height: 36,
-    justifyContent: "center",
-    alignItems: "center",
-    elevation: 4,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
   },
 
   groupIconWrapper: {
