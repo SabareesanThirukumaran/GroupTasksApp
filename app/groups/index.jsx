@@ -1,8 +1,8 @@
-import {View,Text,StyleSheet,TouchableOpacity,FlatList,Modal,TextInput,Dimensions,Touchable,} from "react-native";
-import { ScrollView, Swipeable } from "react-native-gesture-handler";
+import {View,Text,StyleSheet,TouchableOpacity,FlatList,Modal,TextInput,Dimensions,} from "react-native";
+import { ScrollView } from "react-native-gesture-handler";
 import { Color as Colours } from "../../constants/colors";
 import { AntDesign, Ionicons, FontAwesome } from "@expo/vector-icons";
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import Fuse from "fuse.js";
 
 const width = Dimensions.get("window").width;

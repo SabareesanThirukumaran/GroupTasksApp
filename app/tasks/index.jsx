@@ -1,6 +1,6 @@
-import {View,Text,StyleSheet,TouchableOpacity,FlatList,Modal,TextInput,Dimensions,} from "react-native";
+import {View,Text,StyleSheet,TouchableOpacity,FlatList,Modal,TextInput,Dimensions,Platform} from "react-native";
 import { ScrollView, Swipeable, Switch } from "react-native-gesture-handler";
-import { Color, Color as Colours } from "../../constants/colors";
+import {Color as Colours } from "../../constants/colors";
 import { AntDesign, Ionicons, FontAwesome } from "@expo/vector-icons";
 import React, { useEffect, useRef, useState } from "react";
 import DateTimePicker from "@react-native-community/datetimepicker";
@@ -14,7 +14,7 @@ export default function TaskScreen() {
     { id: '1', title: 'Task 1', dueDate: '2024-06-10', difficulty: 'Easy', description: "Hello my name is", groupId: 1 },
     { id: '2', title: 'Task 2', dueDate: '2024-06-12',  difficulty: 'Medium', description: "Hello my name is", groupId: 1 },
     { id: '3', title: 'Task 3', dueDate: '2024-06-15', difficulty: 'Hard', description: "Hello my name is", groupId: 3 },
-    { id: '4', title: 'Task 4', dueDate: '2024-06-15', difficulty: 'Hard', description: "Hello my name is", groupId: 2 },
+    { id: '4', title: 'Task 4', dueDate: '', difficulty: 'Hard', description: "Hello my name is", groupId: 2 },
   ]);
   const [groups, setGroups] = useState([
     {id: 1, name: "Study Group", members: 23, colour: Colours.groupColours[0], icon: "book", tasksDone: 15, percent: 65, tasks:23},
@@ -32,13 +32,28 @@ export default function TaskScreen() {
   const [difficulty, setDifficulty] = useState("Easy");
   const [hasDueDate, setHasDueDate] = useState(false);
   const [selectedGroupT, setSelectedGroupT] = useState(null);
+
+  const [selectedTask, setSelectedTask] = useState(null);
+  const [taskModalVisible, setTaskModalVisible] = useState(false);
+
+  const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [filterButtonLayout, setFilterButtonLayout] = useState(null);
+  const [selectedGroupFilter, setSelectedGroupFilter] = useState([]);
+
+  const filterButtonRef = useRef(null);
+  const completedFilterButtonRef = useRef(null);
+
+  const [completedFilterModalVisible, setCompletedFilterModalVisible] = useState(false);
+  const [completedFilterButtonLayout, setCompletedFilterButtonLayout] = useState(null);
+  const [selectedCompletedGroupFilter, setSelectedCompletedGroupFilter] = useState([]);
+
   
   const [remainingSearchValue, setRemainingSearchValue] = useState("");
   const remainingFuse = new Fuse(
-    tasks.filter((task) => !task.completed),
+    tasks.filter(task => task && !task.completed),
     {
       includeScore: true,
-      keys: ["name", "description", "difficulty"],
+      keys: ["title", "description", "difficulty"],
     }
   );
   const [remainingTasks, setRemainingTasks] = useState(
@@ -60,7 +75,7 @@ export default function TaskScreen() {
     tasks.filter((task) => task.completed),
     {
       includeScore: true,
-      keys: ["name", "description", "difficulty"],
+      keys: ["title", "description", "difficulty"],
     }
   );
 
@@ -89,18 +104,6 @@ export default function TaskScreen() {
     year: "numeric",
   });
 
-  const nextDate = () => {
-    const newDate = new Date(currentDate);
-    newDate.setDate(currentDate.getDate() + 7);
-    setCurrentDate(newDate);
-  };
-
-  const prevDate = () => {
-    const newDate = new Date(currentDate);
-    newDate.setDate(currentDate.getDate() - 7);
-    setCurrentDate(newDate);
-  };
-
   const toggleComplete = (id) => {
     setTasks((prev) =>
       prev.map((task) =>
@@ -126,6 +129,25 @@ export default function TaskScreen() {
     </TouchableOpacity>
   );
 
+  const getDifficultyColor = (level) => {
+  switch(level){
+    case "Easy": return "#43a047";
+    case "Medium": return "#f57c00";
+    case "Hard": return "#e53935";
+    default: return Colours.defaultText;
+  }
+}
+
+  const canSwipeRef = useRef({});
+
+  useEffect(() => {
+    tasks.forEach(task => {
+      if (!canSwipeRef.current[task.id]) {
+        canSwipeRef.current[task.id] = React.createRef();
+      }
+    });
+  })
+
   const renderTask = (task) => {
     const difficultyStyleMap = {
       Easy: {
@@ -144,39 +166,48 @@ export default function TaskScreen() {
 
     return (
       <Swipeable
+        ref = {canSwipeRef.current[task.id]}
         key={task.id}
         renderRightActions={() => renderRightActions(task)}
         childrenContainerStyle={styles.taskCard}
-        containerStyle={{
-          width: "100%",
-        }}
+        containerStyle={{width: "100%"}}
+
       >
-        <View
-          style={[
-            styles.taskCardGroupIndicator,
-            { backgroundColor: groups.find((group) => group.id === task.groupId)?.colour || Colours.defaultText},
-          ]}
-        />
-        <View style={styles.taskCardMainContent}>
-          <View style={styles.taskCardDetails}>
-            <Text
-              style={styles.taskCardName}
-              numberOfLines={1}
-              ellipsizeMode="tail"
-            >
-              {task.title}
-            </Text>
-            <Text style={styles.taskCardDescription}>{task.description}</Text>
+        <TouchableOpacity onPress={() => {
+          if (canSwipeRef.current) {
+            canSwipeRef.current[task.id]?.current?.close();
+          }
+          setSelectedTask(task);
+          setTaskModalVisible(true);
+        }} style={{ flexDirection: "row"}}>
+          <View
+            style={[
+              styles.taskCardGroupIndicator,
+              { backgroundColor: groups.find((group) => group.id === task.groupId)?.colour || Colours.primary},
+            ]}
+          />
+          <View style={styles.taskCardMainContent}>
+            <View style={styles.taskCardDetails}>
+              <Text
+                style={styles.taskCardName}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {task.title}
+              </Text>
+              <Text style={styles.taskCardDescription}>{task.description}</Text>
+            </View>
           </View>
-        </View>
-        <View
-          style={[
-            styles.taskDifficultyContainer,
-            difficultyStyleMap[task.difficulty],
-          ]}
-        >
-          <Text>{task.difficulty}</Text>
-        </View>
+          <View
+            style={[
+              styles.taskDifficultyContainer,
+              difficultyStyleMap[task.difficulty],
+            ]}
+          >
+            <Text>{task.difficulty}</Text>
+          </View>
+          <Text style={styles.dueDate}>Due : {task.dueDate ? task.dueDate : "No Due Date"}</Text>
+        </TouchableOpacity>
       </Swipeable>
     );
   };
@@ -191,22 +222,24 @@ export default function TaskScreen() {
       : 1;
 
     const newTask = {
-      id: newId,
-      name: taskSelected,
-      time: timeSelected.toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-      creator: "You",
+      id: newId.toString(),
+      title: taskSelected,
+      dueDate: dateSelected ? dateSelected.toISOString().split('T')[0] : "",
+      difficulty,
+      description: taskDescription,
+      groupId: selectedGroupT?.id || null,
       completed: false,
     };
 
     setTasks((prevTasks) => [...prevTasks, newTask]);
-    setModalVisible(false);
+    setShowAddTaskModal(false);
     setTaskName("");
     setTaskDate(new Date());
     setTaskTime(new Date());
   };
+
+  const filteredTasks = remainingTasks.filter(task => selectedGroupFilter.length === 0 || selectedGroupFilter.includes(task.groupId));
+  const filteredCompletedTasks = completedTasks.filter(task => selectedCompletedGroupFilter.length === 0 || selectedCompletedGroupFilter.includes(task.groupId));
 
   return (
     <View style={styles.entire}>
@@ -258,23 +291,20 @@ export default function TaskScreen() {
 
         <View style={styles.tasks}>
           <View style={styles.tasksLabelContainer}>
-            <Text
-              style={[
-                styles.tasksLabel,
-              ]}
-            >
-              Remaining
-            </Text>
+            <Text style={styles.tasksLabel}>Remaining</Text>
             <View style={styles.tasksLabelOptionsContainer}>
-              <TouchableOpacity style={styles.tasksLabelFilterButton}>
+              <TouchableOpacity ref={filterButtonRef} style={styles.tasksLabelFilterButton} 
+              onPress={() => {
+                if (filterButtonRef.current) {
+                  filterButtonRef.current.measureInWindow((x, y, width, height) => {
+                    setFilterButtonLayout({ x, y, width, height });
+                    setFilterModalVisible(true);
+                  })
+              }}}>
                 <Ionicons name="filter" size={24} color={Colours.defaultText} />
               </TouchableOpacity>
               <View style={styles.tasksSearchContainer}>
-                <FontAwesome
-                  name="search"
-                  size={24}
-                  color={Colours.defaultText}
-                />
+                <FontAwesome name="search" size={24} color={Colours.defaultText}/>
                 <TextInput
                   placeholder="Search"
                   value={remainingSearchValue}
@@ -292,16 +322,13 @@ export default function TaskScreen() {
               </View>
             </View>
           </View>
-
-          {tasks.filter((task) => !task.completed).length == 0 && (
-            <Text
-              style={{ width: "100%", textAlign: "center", marginBottom: 12 }}
-            >
-              No tasks left!
-            </Text>
-          )}
-
-          {remainingTasks.map(renderTask)}
+          
+          <FlatList data={filteredTasks} keyExtractor={(item) => item.id.toString()} renderItem={({ item }) => renderTask(item)} ListEmptyComponent={
+              <Text style={{ width: "100%", textAlign: "center"}}>
+                No tasks left!
+              </Text>}
+            scrollEnabled={false}
+          />
         </View>
 
         <View style={styles.tasks}>
@@ -309,15 +336,19 @@ export default function TaskScreen() {
             <Text
               style={[
                 styles.tasksLabel,
-                {
-                  /*color: Colours.warning*/
-                },
               ]}
             >
               Completed
             </Text>
             <View style={styles.tasksLabelOptionsContainer}>
-              <TouchableOpacity style={styles.tasksLabelFilterButton}>
+              <TouchableOpacity ref={completedFilterButtonRef} style={styles.tasksLabelFilterButton} 
+              onPress={() => {
+                if (completedFilterButtonRef.current) {
+                  completedFilterButtonRef.current.measureInWindow((x, y, width, height) => {
+                    setCompletedFilterButtonLayout({ x, y, width, height });
+                    setCompletedFilterModalVisible(true);
+                  })
+              }}}>
                 <Ionicons name="filter" size={24} color={Colours.defaultText} />
               </TouchableOpacity>
               <View style={styles.tasksSearchContainer}>
@@ -343,14 +374,12 @@ export default function TaskScreen() {
               </View>
             </View>
           </View>
-          {tasks.filter((task) => task.completed).length == 0 && (
-            <Text
-              style={{ width: "100%", textAlign: "center", marginBottom: 12 }}
-            >
-              No tasks completed!
-            </Text>
-          )}
-          {completedTasks.map(renderTask)}
+           <FlatList data={filteredCompletedTasks} keyExtractor={(item) => item.id.toString()} renderItem={({ item }) => renderTask(item)} ListEmptyComponent={
+              <Text style={{ width: "100%", textAlign: "center"}}>
+                No tasks left!
+              </Text>}
+            scrollEnabled={false}
+            />
         </View>
 
       </ScrollView>
@@ -423,27 +452,134 @@ export default function TaskScreen() {
             <Text style={styles.popupInfo}>Description</Text>
             <TextInput style={[styles.textInp, { height: 80, textAlignVertical: "top" }]} placeholder="Add more details..." placeholderTextColor={Colours.textSecondary} value={taskDescription} onChangeText={setTaskDescription}multiline/>
 
-            <TouchableOpacity style={styles.addButton} onPress={() => addTask(taskName, hasDueDate ? taskDate : null, hasDueDate ? taskTime : null, difficulty, selectedGroup, taskDescription)}>
+            <TouchableOpacity style={styles.addButton} onPress={() => addTask(taskName, hasDueDate ? taskDate : null, hasDueDate ? taskTime : null, difficulty, selectedGroupT, taskDescription)}>
               <Text style={styles.addText}>Add Task</Text>
               <AntDesign name="enter" color={Colours.primaryText} size={24} />
             </TouchableOpacity>
 
-            {showDatePicker && ( <DateTimePicker value={taskDate} mode="date" display="default" onChange={(event, selectedDate) => {setShowDatePicker(false); if (selectedDate) setTaskDate(selectedDate);}}/>)}
-            {showTimePicker && ( <DateTimePicker value={taskTime} mode="time" is24Hour={true} display="default" onChange={(event, selectedTime) => { setShowTimePicker(false); if (selectedTime) setTaskTime(selectedTime); }} />)}
+            {showDatePicker && ( <DateTimePicker value={taskDate} mode="date" display={Platform.OS === "ios" ? "spinner" : "default"} onChange={(event, selectedDate) => {setShowDatePicker(false); if (selectedDate) setTaskDate(selectedDate);}}/>)}
+            {showTimePicker && ( <DateTimePicker value={taskTime} mode="time" is24Hour={true} display={Platform.OS === "ios" ? "spinner" : "default"} onChange={(event, selectedTime) => { setShowTimePicker(false); if (selectedTime) setTaskTime(selectedTime); }} />)}
           </View>
         </View>
       </Modal>
-    </View>
+      
+      <Modal visible={taskModalVisible} animationType="fade" transparent={true} onRequestClose={() => setTaskModalVisible(false)}>
+        <View style={styles.modalOverlay}>
+
+          <View style={styles.taskDetailsModal}>
+            <TouchableOpacity style={styles.close} onPress={() => setTaskModalVisible(false)}>
+              <AntDesign name="close-circle" size={30} color="white"></AntDesign>
+            </TouchableOpacity>
+
+            {selectedTask && (
+              <>
+                <Text style={styles.modalTitle}>{selectedTask.title}</Text>
+
+                <View style={styles.modalRow}>
+                  <Text style={[styles.modalLabel, { marginTop: 0 }]}>Description</Text>
+                  <Text style={styles.modalValue}>{selectedTask.description || "No description provided."}</Text>
+                </View>
+
+                <View style={styles.modalRow}>
+                  <Text style={styles.modalLabel}>Due Date:</Text>
+                  <Text style={styles.modalValue}>{selectedTask.dueDate || "No due date set."}</Text>
+                </View>
+
+                <View style={styles.modalRow}>
+                  <Text style={styles.modalLabel}>Difficulty:</Text>
+                  <Text style={[styles.modalValue, {color: getDifficultyColor(selectedTask.difficulty)}]}>{selectedTask.difficulty}</Text>
+                </View>
+
+                <View style={styles.modalRow}>
+                  <Text style={styles.modalLabel}>Group:</Text>
+                  <View style={{flexDirection:"row", alignItems:"center"}}>
+                    <View style={{width:15, height:15, borderRadius:4, backgroundColor: groups.find(g=>g.id===selectedTask.groupId)?.colour || "#ccc", marginRight:8}}/>
+                    <Text style={styles.modalValue}>{groups.find(g=>g.id===selectedTask.groupId)?.name || "No group assigned."}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.modalRow}>
+                  <Text style={styles.modalLabel}>Status:</Text>
+                  <Text style={[styles.modalValue, {color: selectedTask.completed ? "#43a047" : "#f57c00"}]}>{selectedTask.completed ? "Completed" : "Remaining"}</Text>
+                </View>
+              </>)}
+          </View>
+        </View>
+
+      </Modal>
+
+      {filterModalVisible && filterButtonLayout && (
+        <Modal transparent={true} animationType="fade">
+          <TouchableOpacity activeOpacity={1} style={styles.overlay} onPress={() => setFilterModalVisible(false)} />
+            
+          <View style={[styles.filterDropdown, {position: "absolute", top:filterButtonLayout.y + filterButtonLayout.height + 5, left: filterButtonLayout.x}]}>
+            <ScrollView nestedScrollEnabled={true}>
+              {groups.map((group) => {
+                const isSelected = selectedGroupFilter.includes(group.id);
+                return (
+                  <TouchableOpacity key={group.id} style={{flexDirection: "row", alignItems: "center", paddingVertical: 12, paddingHorizontal: 10, borderBottomWidth: 1, borderBlockColor: "#eee"}} onPress={() => {
+                      if (isSelected) {
+                        setSelectedGroupFilter(selectedGroupFilter.filter((id) => id !== group.id));
+                      } else {
+                        setSelectedGroupFilter([...selectedGroupFilter, group.id]);
+                      }
+                    }}>
+                    <View style={[styles.filterCheckbox, {borderColor: group.colour, backgroundColor: isSelected ? group.colour : "white"}]}>
+                      {isSelected && <AntDesign name="check" size={14} color="white" />}
+                    </View>
+                    <Text style={[styles.pillText]}>{group.name}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </Modal>
+      )}
+
+      {completedFilterButtonLayout && completedFilterModalVisible && (
+        <Modal transparent={true} animationType="fade">
+          <TouchableOpacity activeOpacity={1} style={styles.overlay} onPress={() => setCompletedFilterModalVisible(false)} />
+            
+          <View style={[styles.filterDropdown, {position: "absolute", top:completedFilterButtonLayout.y + completedFilterButtonLayout.height + 5, left: completedFilterButtonLayout.x}]}>
+            <ScrollView nestedScrollEnabled={true}>
+              {groups.map((group) => {
+                const isSelected = selectedCompletedGroupFilter.includes(group.id);
+                return (
+                  <TouchableOpacity key={group.id} style={{flexDirection: "row", alignItems: "center", paddingVertical: 12, paddingHorizontal: 10, borderBottomWidth: 1, borderBlockColor: "#eee"}} onPress={() => {
+                      if (isSelected) {
+                        setSelectedCompletedGroupFilter(selectedCompletedGroupFilter.filter((id) => id !== group.id));
+                      } else {
+                        setSelectedCompletedGroupFilter([...selectedCompletedGroupFilter, group.id]);
+                      }
+                    }}>
+                    <View style={[styles.filterCheckbox, {borderColor: group.colour, backgroundColor: isSelected ? group.colour : "white"}]}>
+                      {isSelected && <AntDesign name="check" size={14} color="white" />}
+                    </View>
+                    <Text style={[styles.pillText]}>{group.name}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </Modal>
+      )}
+
+      </View>
   );
 }
 
 const styles = StyleSheet.create({
+  // =========================
+  // ENTIRE SCREEN
+  // =========================
   entire: {
     flex: 1,
     backgroundColor: Colours.background,
   },
 
-  // Top Header Section
+  // =========================
+  // TOP HEADER
+  // =========================
   topHeader: {
     flexDirection: "row",
     alignItems: "center",
@@ -468,8 +604,9 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
 
-  // Task Section
-
+  // =========================
+  // TASK SECTION
+  // =========================
   header: {
     width: "100%",
     flexDirection: "row",
@@ -515,7 +652,7 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
     marginTop: 5,
   },
-  
+
   taskCard: {
     backgroundColor: Colours.surface,
     borderRadius: 14,
@@ -540,9 +677,10 @@ const styles = StyleSheet.create({
 
   taskCardGroupIndicator: {
     width: 4,
-    height: "100%",
-    borderRadius: 10,
+    borderRadius: 2,
     marginRight: 12,
+    backgroundColor: Colours.primary,
+    alignSelf: "stretch",
   },
 
   taskCardDetails: {
@@ -563,7 +701,7 @@ const styles = StyleSheet.create({
 
   taskDifficultyContainer: {
     position: "absolute",
-    top: 12,
+    top: -5,
     right: 12,
     backgroundColor: Colours.background,
     paddingHorizontal: 10,
@@ -572,7 +710,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colours.surfaceBorder,
   },
-  
+
+  dueDate: {
+    position: "absolute",
+    right: 10,
+    bottom: -5,
+  },
+
   tasksLabelContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -628,8 +772,9 @@ const styles = StyleSheet.create({
     height: "85%",
   },
 
+  // =========================
   // POPUP STYLES
-
+  // =========================
   addTask: {
     minWidth: "100%",
     position: "absolute",
@@ -676,7 +821,7 @@ const styles = StyleSheet.create({
 
   close: {
     position: "absolute",
-    top:12,
+    top: 12,
     right: 12,
     backgroundColor: "#0F6EC6",
     borderRadius: 20,
@@ -766,10 +911,14 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
 
+  // =========================
+  // PILL STYLES
+  // =========================
   pill: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between"
+    justifyContent: "center",
+    marginTop: 10,
   },
 
   pillButton: {
@@ -784,13 +933,12 @@ const styles = StyleSheet.create({
   },
 
   activeButton: {
-    backgroundColor: Colours.primary,
-    borderColor: Colours.primary,
+    backgroundColor: "#0F6EC6",
   },
 
   pillText: {
-    color: Colours.secondaryText,
     fontWeight: "600",
+    color: Colours.defaultText,
   },
 
   activeText: {
@@ -816,28 +964,102 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
 
-  pill: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 10,
-  },
-
-
-  pillText: {
-    fontWeight: "600",
-    color: Colours.defaultText,
-  },
-
-  activeButton: {
-    backgroundColor: "#0F6EC6",
-  },
-
   selectedColorBorder: {
     borderColor: "#0F6EC6",
     transform: [{ scale: 1.1 }],
     elevation: 3,
   },
 
+  // =========================
+  // MODAL STYLES
+  // =========================
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.5)",
+    padding: 20,
+  },
+
+  taskDetailsModal: {
+    width: "100%",
+    maxWidth: 360,
+    backgroundColor: Colours.surface,
+    borderRadius: 20,
+    padding: 25,
+    elevation: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+  },
+
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: Colours.primary,
+    textAlign: "center",
+    marginBottom: 20,
+  },
+
+  modalRow: {
+    marginBottom: 15,
+  },
+
+  modalLabel: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: Colours.grayText,
+    marginBottom: 4,
+  },
+
+  modalValue: {
+    fontSize: 16,
+    color: Colours.defaultText,
+  },
+
+  // =========================
+  // FILTER DROPDOWN
+  // =========================
+
+  overlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+
+  filterDropdown: {
+    width: 220,
+    backgroundColor: "white",
+    borderRadius: 10,
+    maxHeight: 300,
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+  },
+
+  filterItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+  },
+
+  filterCheckbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 5,
+    borderWidth: 2,
+    marginRight: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
 
 });
+

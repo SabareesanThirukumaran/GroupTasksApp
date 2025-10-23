@@ -5,12 +5,13 @@ import Svg, { Path, G, Circle} from "react-native-svg";
 import { Color as Colours } from "../../constants/colors";
 import { AntDesign, FontAwesome, Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { Colors } from "react-native/Libraries/NewAppScreen";
 import DateTimePicker from "@react-native-community/datetimepicker";
 const width = Dimensions.get("window").width;
 const height = Dimensions.get("window").height;
 
 export default function home() {
+  const router = useRouter();
+
   const [tasks, setTasks] = useState([
     { id: '1', title: 'Task 1', dueDate: '2024-06-10', difficulty: 'Easy', description: "" },
     { id: '2', title: 'Task 2', dueDate: '2024-06-12',  difficulty: 'Medium', description: "" },
@@ -46,11 +47,6 @@ export default function home() {
   const groupsJoined = 3;
   const mostActiveGroup = "Math Club";
   const leastActiveGroup = "Science Club";
-  const groupStats = [
-    { name: "Math Club", percent: 80 },
-    { name: "Science Club", percent: 20 },
-    { name: "Chess Club", percent: 50 },
-  ];
 
   const [showRecentGroup, setShowRecentGroup] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState(null);
@@ -215,7 +211,7 @@ export default function home() {
 
             <View style={styles.taskContainer}>
                 {tasks.slice(0, 2).map((task, index) => renderTask(task, index))}
-                <TouchableOpacity onPress={() => useRouter().push("/tasks")}>
+                <TouchableOpacity onPress={() => router.push("/tasks")}>
                   <Text style={styles.viewAllTasks}>View All Tasks <Ionicons name="arrow-forward-outline" size={15} color="#0F6EC6" /></Text>
                 </TouchableOpacity>
             </View>
@@ -320,7 +316,7 @@ export default function home() {
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginVertical: 10}}>
               {["book", "people-sharp", "school", "home", "fitness", "briefcase", "game-controller", "musical-notes"].map((iconName, index) => (
                 <TouchableOpacity key={iconName} style={[styles.iconOption, selectedIcon === iconName && styles.iconSelected]} onPress={() => setSelectedIcon(iconName)}>
-                  <Ionicons name={iconName} size={28} color={selectedIcon === iconName ? "white" : Colors.defaultText} />
+                  <Ionicons name={iconName} size={28} color={selectedIcon === iconName ? "white" : Colours.defaultText} />
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -404,7 +400,7 @@ export default function home() {
 
             <View style={{ marginTop: 20 }}>
               <Text style={styles.sectionTitle}>Tasks Completed Per Group</Text>
-              {groupStats.map((group, idx) => (
+              {groups.map((group, idx) => (
                 <View key={idx} style={{ marginBottom: 15 }}>
                   <Text style={{ fontWeight: "600", color: Colours.defaultText, marginBottom: 5 }}>
                     {group.name} - {group.percent}%
