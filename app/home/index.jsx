@@ -1,27 +1,56 @@
-import React, {useEffect, useRef, useState} from "react";
-import { View, StyleSheet, Dimensions, Text, FlatList, TouchableOpacity, Modal, TextInput } from "react-native";
-import { ScrollView, Swipeable, Switch } from "react-native-gesture-handler";
+import {useState} from "react";
+import { View, StyleSheet, Dimensions, Text, TouchableOpacity, Modal, TextInput, Alert } from "react-native";
+import { ScrollView, Switch } from "react-native-gesture-handler";
 import Svg, { Path, G, Circle} from "react-native-svg";
 import { Color as Colours } from "../../constants/colors";
 import { AntDesign, FontAwesome, Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import DateTimePicker from "@react-native-community/datetimepicker";
+import ToastAlert from "../../toastAlert";
 const width = Dimensions.get("window").width;
 const height = Dimensions.get("window").height;
 
-export default function home() {
+export default function Home() {
   const router = useRouter();
+  const userId = 1;
 
   const [tasks, setTasks] = useState([
-    { id: '1', title: 'Task 1', dueDate: '2024-06-10', difficulty: 'Easy', description: "" },
-    { id: '2', title: 'Task 2', dueDate: '2024-06-12',  difficulty: 'Medium', description: "" },
-    { id: '3', title: 'Task 3', dueDate: '2024-06-15', difficulty: 'Hard', description: "" },
-    { id: '4', title: 'Task 4', dueDate: '2024-06-15', difficulty: 'Hard', description: "" },
+    { id: '1', title: 'Task 1', dueDate: '2024-06-10', difficulty: 'Easy', description: "Hello my name is", groupId: 1, completed: false  },
+    { id: '2', title: 'Task 2', dueDate: '2024-06-12',  difficulty: 'Medium', description: "Hello my name is", groupId: 1, completed: true  },
+    { id: '3', title: 'Task 3', dueDate: '2024-06-15', difficulty: 'Hard', description: "Hello my name is", groupId: 3, completed: false  },
+    { id: '4', title: 'Task 4', dueDate: '', difficulty: 'Hard', description: "Hello my name is", groupId: 2, completed: false  },
   ]);
-  const [groups, setGroups] = useState([
-    {id: 1, name: "Study Group", members: 23, colour: Colours.groupColours[0], icon: "book", tasksDone: 15, percent: 65, tasks:23},
-    {id: 2, name: "Dorm Group", members: 5, colour: Colours.groupColours[2], icon: "people-sharp", tasksDone: 15, percent: 65, tasks:23},
-    {id: 3, name: "Study Group", members: 23, colour: Colours.groupColours[0], icon: "book", tasksDone: 15, percent: 65, tasks:23},
+  const [allGroups, setAllGroups] = useState([
+    {
+    id: 1, name: "Study Group", 
+    membersList: [      
+      { id: 1, name: "Alice" },
+      { id: 2, name: "Ben" },
+      { id: 3, name: "Chris" },],
+       colour: Colours.groupColours[0], icon: "book", tasksDone: 15, percent: 65, tasks:23, type: "Public", code:"KG3BN8L9", creatorId: 3},
+    {id: 2, name: "Dorm Group",
+      membersList: [      
+      { id: 1, name: "Alice" },
+      { id: 2, name: "Ben" },
+      { id: 3, name: "Chris" },], colour: Colours.groupColours[2], icon: "people-sharp", tasksDone: 15, percent: 65, tasks:23, type: "Public", code:"5HRT9X2Q", creatorId: 1},
+    {id: 3, name: "Book Group",
+      membersList: [      
+      { id: 1, name: "Alice" },
+      { id: 2, name: "Ben" },
+      { id: 3, name: "Chris" },], colour: Colours.groupColours[1], icon: "book", tasksDone: 15, percent: 65, tasks:23, type: "Public", code: "8DF2S7LT", creatorId: 2},
+  ]);
+  const [myGroups, setMyGroups] = useState([
+    {id: 2, name: "Dorm Group",
+    membersList: [   
+      { id: 1, name: "You" },   
+      { id: 2, name: "Alice" },
+      { id: 3, name: "Ben" },
+      { id: 4, name: "Chris" },], colour: Colours.groupColours[2], icon: "people-sharp", tasksDone: 15, percent: 65, tasks:23, type: "Public", code:"5HRT9X2Q", creatorId: 1},
+    {id: 3, name: "Book Group",
+    membersList: [      
+      { id: 2, name: "Alice" },
+      { id: 3, name: "Ben" },
+      { id: 4, name: "Chris" },], colour: Colours.groupColours[1], icon: "book", tasksDone: 15, percent: 65, tasks:23, type: "Public", code: "8DF2S7LT", creatorId: 2},
   ]);
 
   const [showAddTaskModal, setShowAddTaskModal] = useState(false);
@@ -51,6 +80,12 @@ export default function home() {
   const [showRecentGroup, setShowRecentGroup] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState(null);
 
+  const totalMembers = myGroups.reduce((sum, group) => group.creatorId === userId ? sum + group.membersList.length : sum, 0);
+  const progressPercentage = tasks.length > 0 ? tasks.filter((task) => task.completed).length / tasks.length  * 100 : 0;
+
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertMessage, setAlertMessage] = useState("");
+  const showAlertText = (message) => {setAlertMessage(message); setAlertVisible(true);}
 
   let renderTask = (task, index) => {
     const difficultyStyleMap = {
@@ -87,7 +122,7 @@ export default function home() {
   }
 
   let renderGroup = (group, index) => {
-    const isLast = index === 1;
+    const isLast = index === tasks.length - 1;
 
     return (
       <TouchableOpacity key={group.id} style={styles.groupCard} onPress={() => {setShowRecentGroup(true); setSelectedGroup(group)}}>
@@ -100,6 +135,102 @@ export default function home() {
       </TouchableOpacity>
     )
   }
+
+  const addTask = (taskSelected, dateSelected) => {
+    if (!taskSelected.trim()) {
+      alert("Please enter a task name!");
+      return;
+    }
+    const newId = tasks.length
+      ? Math.max(...tasks.map((task) => Number(task.id))) + 1
+      : 1;
+
+    const newTask = {
+      id: newId.toString(),
+      title: taskSelected,
+      dueDate: dateSelected ? dateSelected.toISOString().split('T')[0] : "",
+      difficulty,
+      description: taskDescription,
+      groupId: selectedGroupT?.id || null,
+      completed: false,
+    };
+
+    setTasks((prevTasks) => [...prevTasks, newTask]);
+    setShowAddTaskModal(false);
+    setTaskName("");
+    setTaskDate(new Date());
+    setTaskTime(new Date());
+  };
+
+  const createGroup = (name, type, icon, colour) => {
+    const code = Math.random().toString(36).substring(2, 10).toUpperCase();
+
+    const newGroup = {
+      id: allGroups.length + 1,
+      name: name.trim() || "Untitled Group",
+      membersList: [{ id: userId, name: "You" }],
+      colour: colour,
+      icon: icon,
+      tasksDone: 0,
+      percent: 0,
+      tasks: 0,
+      type: type,
+      code: code,
+      creatorId: userId,
+    };
+    setAllGroups([...allGroups, newGroup]);
+    setMyGroups([...myGroups, newGroup]);
+
+    setShowAddGroupModal(false);
+    setGroupName("");
+    setSelectedIcon("people-sharp");
+    setGroupType("Public");
+    setSelectedColour(Colours.groupColours[0]);
+  }
+
+  const leaveGroup = (selectedGroupId) => {
+    if ((myGroups.find((group) => group.id === selectedGroupId)).membersList.length === 1) {
+      showAlertText("You are the only member in this group. You must delete the group instead.");
+      return;
+    }
+
+    if (myGroups.find((group) => group.id === selectedGroupId).creatorId === userId) {
+      showAlertText("You are the creator. You must delete the group instead.");
+      return;
+    }
+
+    Alert.alert(
+      "Leave Group",
+      "Are you sure you want to leave this group?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Leave",
+          style: "destructive",
+          onPress: () => {
+
+            if (!selectedGroupId) return;
+            setMyGroups(myGroups.filter((group) => group.id !== selectedGroupId));
+
+            const groupToLeave = allGroups.find((group) => group.id === selectedGroupId);
+            if (groupToLeave) {
+              const updatedGroup = {
+                ...groupToLeave,
+                membersList: groupToLeave.membersList.filter(member => member.id !== userId),
+              };
+
+              setAllGroups(allGroups.map((g) =>
+                g.id === selectedGroupId ? updatedGroup : g
+              ));
+
+              setMyGroups(myGroups.filter((g) => g.id !== selectedGroupId));
+            }
+            setShowRecentGroup(false);
+          },
+        },
+      ]
+    );
+  };
 
   return (
     <View style={styles.entire}>
@@ -130,12 +261,12 @@ export default function home() {
               </View>
 
               <View style={styles.taskTextContainer}>
-                <Text style={styles.numTask}>3</Text>
+                <Text style={styles.numTask}>{tasks.filter((task) => !task.completed).length}</Text>
                 <Text style={styles.taskType}>Remaining</Text>
               </View>
 
               <View style={styles.taskTextContainer}>
-                <Text style={styles.numTask}>1</Text>
+                <Text style={styles.numTask}>{tasks.filter((task) => task.completed).length}</Text>
                 <Text style={styles.taskType}>Completed</Text>
               </View>
 
@@ -151,12 +282,12 @@ export default function home() {
               </View>
 
               <View style={styles.taskTextContainer}>
-                <Text style={styles.numTask}>2</Text>
+                <Text style={styles.numTask}>{myGroups.filter((group) => group.creatorId === userId).length}</Text>
                 <Text style={styles.taskType}>Active</Text>
               </View>
 
               <View style={styles.taskTextContainer}>
-                <Text style={styles.numTask}>28</Text>
+                <Text style={styles.numTask}>{totalMembers}</Text>
                 <Text style={styles.taskType}>Members total</Text>
               </View>
 
@@ -172,11 +303,11 @@ export default function home() {
 
             <View style={styles.userProgressBar}>
                 <View style={styles.userBackgroundBar}></View>
-                <View style={styles.userOvergroundBar}></View>
+                <View style={[styles.userOvergroundBar, { width: `${progressPercentage}%`,}]}></View>
             </View>
 
             <View style={styles.userPercentage}>
-              <Text style={styles.userPercentageNum}>67%</Text>
+              <Text style={styles.userPercentageNum}>{progressPercentage}%</Text>
               <Text style={styles.userPercentageText}>Tasks Completed</Text>
             </View>
 
@@ -221,7 +352,7 @@ export default function home() {
             <Text style={styles.quickText}>Active Groups</Text>
 
             <View style={styles.mainGroups}>
-              {groups.slice(0, 2).map((group, index) => (renderGroup(group, index)))}
+              {myGroups.slice(0, 2).map((group, index) => (renderGroup(group, index)))}
             </View>
 
           </View>
@@ -237,7 +368,6 @@ export default function home() {
             </TouchableOpacity>
 
             <Text style={styles.popupText}>Create Task</Text>
-
 
             <Text style={styles.popupInfo}>Task*</Text>
             <TextInput style={styles.textInp} placeholder="Complete Project..." placeholderTextColor={Colours.textSecondary} value={taskName} onChangeText={setTaskName}/>
@@ -278,7 +408,7 @@ export default function home() {
 
             <Text style={styles.popupInfo}>Group*</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginVertical: 10}}>
-              {groups.map((group) => (
+              {myGroups.map((group) => (
                 <TouchableOpacity key={group.id} style={[styles.iconOption, selectedGroupT?.id === group.id && styles.iconSelected, {backgroundColor: group.colour}, ]} onPress={() => setSelectedGroupT(group)}>
                   <Ionicons name={group.icon} size={26} color="white"></Ionicons>
                 </TouchableOpacity>))}
@@ -287,7 +417,7 @@ export default function home() {
             <Text style={styles.popupInfo}>Description</Text>
             <TextInput style={[styles.textInp, { height: 80, textAlignVertical: "top" }]} placeholder="Add more details..." placeholderTextColor={Colours.textSecondary} value={taskDescription} onChangeText={setTaskDescription}multiline/>
 
-            <TouchableOpacity style={styles.addButton} onPress={() => addTask(taskName, hasDueDate ? taskDate : null, hasDueDate ? taskTime : null, difficulty, selectedGroup, taskDescription)}>
+            <TouchableOpacity style={styles.addButton} onPress={() => addTask(taskName, hasDueDate ? taskDate : null)}>
               <Text style={styles.addText}>Add Task</Text>
               <AntDesign name="enter" color={Colours.primaryText} size={24} />
             </TouchableOpacity>
@@ -400,7 +530,7 @@ export default function home() {
 
             <View style={{ marginTop: 20 }}>
               <Text style={styles.sectionTitle}>Tasks Completed Per Group</Text>
-              {groups.map((group, idx) => (
+              {myGroups.map((group, idx) => (
                 <View key={idx} style={{ marginBottom: 15 }}>
                   <Text style={{ fontWeight: "600", color: Colours.defaultText, marginBottom: 5 }}>
                     {group.name} - {group.percent}%
@@ -434,7 +564,7 @@ export default function home() {
                     </View>
                     <Text style={styles.groupName}>{selectedGroup.name}</Text>
                     <Text style={styles.groupMembersText}>
-                      {selectedGroup.members} Members
+                      {selectedGroup.membersList.length} Members
                     </Text>
                   </View>
 
@@ -442,7 +572,7 @@ export default function home() {
                     <View style={styles.statsCard}>
                       <Ionicons name="people-outline" size={24} color="#0F6EC6" />
                       <Text style={styles.statsCardTitle}>Active Members</Text>
-                      <Text style={styles.castatsCardValuerdValue}>{selectedGroup.members}</Text>
+                      <Text style={styles.statsCardValue}>{selectedGroup.membersList.length}</Text>
                     </View>
                     <View style={styles.statsCard}>
                       <Ionicons name="checkmark-done-circle-outline" size={24} color="#43A047" />
@@ -451,7 +581,7 @@ export default function home() {
                     </View>
                   </View>
 
-                  <TouchableOpacity style={styles.leaveButton} onPress={() => leaveGroup(groupId)}>
+                  <TouchableOpacity style={styles.leaveButton} onPress={() => leaveGroup(selectedGroup.id)}>
                     <Text style={styles.leaveButtonText}>Leave</Text>
                     <Ionicons name="log-out-outline" color="white" size={22} />
                   </TouchableOpacity>
@@ -461,6 +591,8 @@ export default function home() {
             </View>
           </View>
       </Modal>
+
+      <ToastAlert message={alertMessage} visible={alertVisible} onHide={() => setAlertVisible(false)}/>
 
     </View>
   );
@@ -635,7 +767,6 @@ const styles = StyleSheet.create({
   userOvergroundBar: {
     backgroundColor: "#0F6EC6",
     height: "100%",
-    width: "70%",
     borderRadius: 10,
     position: "absolute",
   },

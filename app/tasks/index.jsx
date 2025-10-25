@@ -1,4 +1,4 @@
-import {View,Text,StyleSheet,TouchableOpacity,FlatList,Modal,TextInput,Dimensions,Platform} from "react-native";
+import {View,Text,StyleSheet,TouchableOpacity,FlatList,Modal,TextInput,Platform} from "react-native";
 import { ScrollView, Swipeable, Switch } from "react-native-gesture-handler";
 import {Color as Colours } from "../../constants/colors";
 import { AntDesign, Ionicons, FontAwesome } from "@expo/vector-icons";
@@ -6,17 +6,14 @@ import React, { useEffect, useRef, useState } from "react";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import Fuse from "fuse.js";
 
-const width = Dimensions.get("window").width;
-
 export default function TaskScreen() {
-  const [currentDate, setCurrentDate] = useState(new Date());
   const [tasks, setTasks] = useState([
-    { id: '1', title: 'Task 1', dueDate: '2024-06-10', difficulty: 'Easy', description: "Hello my name is", groupId: 1 },
-    { id: '2', title: 'Task 2', dueDate: '2024-06-12',  difficulty: 'Medium', description: "Hello my name is", groupId: 1 },
-    { id: '3', title: 'Task 3', dueDate: '2024-06-15', difficulty: 'Hard', description: "Hello my name is", groupId: 3 },
-    { id: '4', title: 'Task 4', dueDate: '', difficulty: 'Hard', description: "Hello my name is", groupId: 2 },
+    { id: '1', title: 'Task 1', dueDate: '2024-06-10', difficulty: 'Easy', description: "Hello my name is", groupId: 1, completed: false  },
+    { id: '2', title: 'Task 2', dueDate: '2024-06-12',  difficulty: 'Medium', description: "Hello my name is", groupId: 1, completed: true  },
+    { id: '3', title: 'Task 3', dueDate: '2024-06-15', difficulty: 'Hard', description: "Hello my name is", groupId: 3, completed: false  },
+    { id: '4', title: 'Task 4', dueDate: '', difficulty: 'Hard', description: "Hello my name is", groupId: 2, completed: true  },
   ]);
-  const [groups, setGroups] = useState([
+  const [groups] = useState([
     {id: 1, name: "Study Group", members: 23, colour: Colours.groupColours[0], icon: "book", tasksDone: 15, percent: 65, tasks:23},
     {id: 2, name: "Dorm Group", members: 5, colour: Colours.groupColours[2], icon: "people-sharp", tasksDone: 15, percent: 65, tasks:23},
     {id: 3, name: "Study Group", members: 23, colour: Colours.groupColours[0], icon: "book", tasksDone: 15, percent: 65, tasks:23},
@@ -42,23 +39,27 @@ export default function TaskScreen() {
 
   const filterButtonRef = useRef(null);
   const completedFilterButtonRef = useRef(null);
+  const canSwipeRef = useRef({})
 
   const [completedFilterModalVisible, setCompletedFilterModalVisible] = useState(false);
   const [completedFilterButtonLayout, setCompletedFilterButtonLayout] = useState(null);
   const [selectedCompletedGroupFilter, setSelectedCompletedGroupFilter] = useState([]);
-
   
   const [remainingSearchValue, setRemainingSearchValue] = useState("");
-  const remainingFuse = new Fuse(
-    tasks.filter(task => task && !task.completed),
-    {
-      includeScore: true,
-      keys: ["title", "description", "difficulty"],
-    }
-  );
+  const remainingFuse = new Fuse(tasks.filter(task => task && !task.completed),{includeScore: true,keys: ["title", "description", "difficulty"],});
   const [remainingTasks, setRemainingTasks] = useState(
     tasks.filter((task) => !task.completed)
   );
+
+  const [completedSearchValue, setCompletedSearchValue] = useState("");
+  const completedFuse = new Fuse(tasks.filter((task) => task.completed),{includeScore: true,keys: ["title", "description", "difficulty"],});
+  const [completedTasks, setCompletedTasks] = useState(tasks.filter((task) => task.completed));
+
+  const filteredTasks = remainingTasks.filter(task => selectedGroupFilter.length === 0 || selectedGroupFilter.includes(task.groupId));
+  const filteredCompletedTasks = completedTasks.filter(task => selectedCompletedGroupFilter.length === 0 || selectedCompletedGroupFilter.includes(task.groupId));
+
+  useEffect(() => {onCompletedChangeSearch(completedSearchValue);onRemainingChangeSearch(remainingSearchValue);}, [tasks]);;
+  useEffect(() => {tasks.forEach(task => {if (!canSwipeRef.current[task.id]) {canSwipeRef.current[task.id] = React.createRef();}});})
 
   const onRemainingChangeSearch = (newValue) => {
     setRemainingSearchValue(newValue);
@@ -70,18 +71,6 @@ export default function TaskScreen() {
     setRemainingTasks(fuseSearchResults.map(({ item }) => item));
   };
 
-  const [completedSearchValue, setCompletedSearchValue] = useState("");
-  const completedFuse = new Fuse(
-    tasks.filter((task) => task.completed),
-    {
-      includeScore: true,
-      keys: ["title", "description", "difficulty"],
-    }
-  );
-
-  const [completedTasks, setCompletedTasks] = useState(
-    tasks.filter((task) => task.completed)
-  );
   const onCompletedChangeSearch = (newValue) => {
     setCompletedSearchValue(newValue);
     setCompletedTasks(tasks.filter((task) => task.completed));
@@ -91,18 +80,6 @@ export default function TaskScreen() {
     let fuseSearchResults = completedFuse.search(newValue);
     setCompletedTasks(fuseSearchResults.map(({ item }) => item));
   };
-
-  useEffect(() => {
-    onCompletedChangeSearch(completedSearchValue);
-    onRemainingChangeSearch(remainingSearchValue);
-  }, [tasks]);
-  
-  const formattedDate = currentDate.toLocaleDateString("en-GB", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
 
   const toggleComplete = (id) => {
     setTasks((prev) =>
@@ -119,8 +96,13 @@ export default function TaskScreen() {
   const renderRightActions = (task) => (
     <TouchableOpacity
       style={!task.completed ? styles.completeButton : styles.deleteButton}
-      onPress={() => toggleComplete(task.id)}
-    >
+      onPress={() => {
+        if (task.completed) {
+          deleteTask(task.id);
+        } else {
+          toggleComplete(task.id);
+        }
+      }}>
       <AntDesign
         name={!task.completed ? "check" : "close"}
         size={24}
@@ -136,17 +118,7 @@ export default function TaskScreen() {
     case "Hard": return "#e53935";
     default: return Colours.defaultText;
   }
-}
-
-  const canSwipeRef = useRef({});
-
-  useEffect(() => {
-    tasks.forEach(task => {
-      if (!canSwipeRef.current[task.id]) {
-        canSwipeRef.current[task.id] = React.createRef();
-      }
-    });
-  })
+  };
 
   const renderTask = (task) => {
     const difficultyStyleMap = {
@@ -212,7 +184,7 @@ export default function TaskScreen() {
     );
   };
 
-  const addTask = (taskSelected, dateSelected, timeSelected) => {
+  const addTask = (taskSelected, dateSelected) => {
     if (!taskSelected.trim()) {
       alert("Please enter a task name!");
       return;
@@ -237,9 +209,6 @@ export default function TaskScreen() {
     setTaskDate(new Date());
     setTaskTime(new Date());
   };
-
-  const filteredTasks = remainingTasks.filter(task => selectedGroupFilter.length === 0 || selectedGroupFilter.includes(task.groupId));
-  const filteredCompletedTasks = completedTasks.filter(task => selectedCompletedGroupFilter.length === 0 || selectedCompletedGroupFilter.includes(task.groupId));
 
   return (
     <View style={styles.entire}>
