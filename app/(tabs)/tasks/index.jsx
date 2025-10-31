@@ -1,23 +1,22 @@
 import {View,Text,StyleSheet,TouchableOpacity,FlatList,Modal,TextInput,Platform} from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import { ScrollView, Swipeable, Switch } from "react-native-gesture-handler";
-import {Color as Colours } from "../../constants/colors";
+import {Color as Colours } from "../../../constants/colors";
 import { AntDesign, Ionicons, FontAwesome } from "@expo/vector-icons";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import Fuse from "fuse.js";
+import { useRouter } from "expo-router";
+import {useAuth} from "../../../context/AuthContext";
+import { ActivityIndicator } from "react-native";
+import {createTask as createTaskDB, updateTask as updateTaskDB} from "../../../firebase/firebaseService";
+import {useData} from "../../../context/DataContext";
+import LoadingScreen from "../../../components/loadingScreen";
 
 export default function TaskScreen() {
-  const [tasks, setTasks] = useState([
-    { id: '1', title: 'Task 1', dueDate: '2024-06-10', difficulty: 'Easy', description: "Hello my name is", groupId: 1, completed: false  },
-    { id: '2', title: 'Task 2', dueDate: '2024-06-12',  difficulty: 'Medium', description: "Hello my name is", groupId: 1, completed: true  },
-    { id: '3', title: 'Task 3', dueDate: '2024-06-15', difficulty: 'Hard', description: "Hello my name is", groupId: 3, completed: false  },
-    { id: '4', title: 'Task 4', dueDate: '', difficulty: 'Hard', description: "Hello my name is", groupId: 2, completed: true  },
-  ]);
-  const [groups] = useState([
-    {id: 1, name: "Study Group", members: 23, colour: Colours.groupColours[0], icon: "book", tasksDone: 15, percent: 65, tasks:23},
-    {id: 2, name: "Dorm Group", members: 5, colour: Colours.groupColours[2], icon: "people-sharp", tasksDone: 15, percent: 65, tasks:23},
-    {id: 3, name: "Study Group", members: 23, colour: Colours.groupColours[0], icon: "book", tasksDone: 15, percent: 65, tasks:23},
-  ]);
+  const {user, userData, loading: authLoading} = useAuth();
+  const router = useRouter();
+  const { tasks, setTasks, allGroups, myGroups, loading: dataLoading, loadingProgress } = useData();
 
   const [showAddTaskModal, setShowAddTaskModal] = useState(false);
   const [taskName, setTaskName] = useState("");
@@ -37,60 +36,114 @@ export default function TaskScreen() {
   const [filterButtonLayout, setFilterButtonLayout] = useState(null);
   const [selectedGroupFilter, setSelectedGroupFilter] = useState([]);
 
+  const [completedFilterModalVisible, setCompletedFilterModalVisible] = useState(false);
+  const [completedFilterButtonLayout, setCompletedFilterButtonLayout] = useState(null);
+  const [selectedCompletedGroupFilter, setSelectedCompletedGroupFilter] = useState([]);
+
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertMessage, setAlertMessage] = useState("");
+
+  const [remainingSearchValue, setRemainingSearchValue] = useState("");
+  const [remainingTasks, setRemainingTasks] = useState([]);
+  const [completedSearchValue, setCompletedSearchValue] = useState("");
+  const [completedTasks, setCompletedTasks] = useState([]);
+
   const filterButtonRef = useRef(null);
   const completedFilterButtonRef = useRef(null);
   const canSwipeRef = useRef({})
 
-  const [completedFilterModalVisible, setCompletedFilterModalVisible] = useState(false);
-  const [completedFilterButtonLayout, setCompletedFilterButtonLayout] = useState(null);
-  const [selectedCompletedGroupFilter, setSelectedCompletedGroupFilter] = useState([]);
-  
-  const [remainingSearchValue, setRemainingSearchValue] = useState("");
-  const remainingFuse = new Fuse(tasks.filter(task => task && !task.completed),{includeScore: true,keys: ["title", "description", "difficulty"],});
-  const [remainingTasks, setRemainingTasks] = useState(
-    tasks.filter((task) => !task.completed)
-  );
+  const showAlertText = (message) => {setAlertMessage(message); setAlertVisible(true);}
 
-  const [completedSearchValue, setCompletedSearchValue] = useState("");
+  const onRemainingChangeSearch = useCallback((newValue) => {
+    setRemainingSearchValue(newValue);
+    const filtered = tasks.filter((task) => !task.completed);
+    if (newValue === "") {
+      setRemainingTasks(filtered);
+      return;
+    }
+    const remainingFuse = new Fuse(filtered, {
+      includeScore: true,
+      keys: ["title", "description", "difficulty"],
+    });
+    let fuseSearchResults = remainingFuse.search(newValue);
+    setRemainingTasks(fuseSearchResults.map(({ item }) => item));
+  }, [tasks]);
+
+  const onCompletedChangeSearch = useCallback((newValue) => {
+    setCompletedSearchValue(newValue);
+    const filtered = tasks.filter((task) => task.completed);
+    if (newValue === "") {
+      setCompletedTasks(filtered);
+      return;
+    }
+    const completedFuse = new Fuse(filtered, {
+      includeScore: true,
+      keys: ["title", "description", "difficulty"],
+    });
+    let fuseSearchResults = completedFuse.search(newValue);
+    setCompletedTasks(fuseSearchResults.map(({ item }) => item));
+  }, [tasks]);
+  
+  useEffect(() => {
+    onCompletedChangeSearch(completedSearchValue);
+    onRemainingChangeSearch(remainingSearchValue);
+  }, [tasks, onCompletedChangeSearch, onRemainingChangeSearch]);
+
+  useEffect(() => {
+    tasks.forEach(task => {
+      if (!canSwipeRef.current[task.id]) {
+        canSwipeRef.current[task.id] = React.createRef();
+      }
+    });
+  }, [tasks]);
+
+  if (authLoading || dataLoading) {
+    return <LoadingScreen progress={loadingProgress} />;
+  }
+
+  if (!user || !userData) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
+        <Text style={{ marginTop: 10, color: "#666" }}>Please log in</Text>
+      </View>
+    );
+  }
+  
+  const userId = user.uid;
+  const remainingFuse = new Fuse(tasks.filter(task => task && !task.completed),{includeScore: true,keys: ["title", "description", "difficulty"],});
   const completedFuse = new Fuse(tasks.filter((task) => task.completed),{includeScore: true,keys: ["title", "description", "difficulty"],});
-  const [completedTasks, setCompletedTasks] = useState(tasks.filter((task) => task.completed));
 
   const filteredTasks = remainingTasks.filter(task => selectedGroupFilter.length === 0 || selectedGroupFilter.includes(task.groupId));
   const filteredCompletedTasks = completedTasks.filter(task => selectedCompletedGroupFilter.length === 0 || selectedCompletedGroupFilter.includes(task.groupId));
 
-  useEffect(() => {onCompletedChangeSearch(completedSearchValue);onRemainingChangeSearch(remainingSearchValue);}, [tasks]);;
-  useEffect(() => {tasks.forEach(task => {if (!canSwipeRef.current[task.id]) {canSwipeRef.current[task.id] = React.createRef();}});})
+  const toggleComplete = async (id) => {
+    const currentTask = tasks.find(task => task.id === id)
+    if (!currentTask) return;
 
-  const onRemainingChangeSearch = (newValue) => {
-    setRemainingSearchValue(newValue);
-    setRemainingTasks(tasks.filter((task) => !task.completed));
-    if (newValue == "") {
-      return;
+    const updates = {completedBy: [...currentTask.completedBy, userId]}
+    const result = await updateTaskDB(id, updates)
+
+    if (result.success) {
+      setTasks((prev) =>
+        prev.map((task) =>
+          task.id === id ? { ...task, completedBy: updates.completedBy, completed: true } : task
+        )
+      );
     }
-    let fuseSearchResults = remainingFuse.search(newValue);
-    setRemainingTasks(fuseSearchResults.map(({ item }) => item));
+
   };
 
-  const onCompletedChangeSearch = (newValue) => {
-    setCompletedSearchValue(newValue);
-    setCompletedTasks(tasks.filter((task) => task.completed));
-    if (newValue == "") {
-      return;
+  const deleteTask = async (id) => {
+    const currentTask = tasks.find(task => task.id === id);
+    if (!currentTask) return;
+
+    const updates = {deletedBy: [...currentTask.deletedBy, userId]}
+    const result = await updateTaskDB(id, updates)
+
+    if (result.success) {
+      setTasks((prev) => prev.map((task) => task.id === id ? {...task, deletedBy: updates.deletedBy} : task));
     }
-    let fuseSearchResults = completedFuse.search(newValue);
-    setCompletedTasks(fuseSearchResults.map(({ item }) => item));
-  };
 
-  const toggleComplete = (id) => {
-    setTasks((prev) =>
-      prev.map((task) =>
-        task.id === id ? { ...task, completed: !task.completed } : task
-      )
-    );
-  };
-
-  const deleteTask = (id) => {
-    setTasks((prev) => prev.filter((task) => task.id !== id));
   };
 
   const renderRightActions = (task) => (
@@ -136,6 +189,10 @@ export default function TaskScreen() {
       },
     };
 
+    if (task.deletedBy.includes(userId)) {
+      return
+    }
+
     return (
       <Swipeable
         ref = {canSwipeRef.current[task.id]}
@@ -155,7 +212,7 @@ export default function TaskScreen() {
           <View
             style={[
               styles.taskCardGroupIndicator,
-              { backgroundColor: groups.find((group) => group.id === task.groupId)?.colour || Colours.primary},
+              { backgroundColor: myGroups.find((group) => group.id === task.groupId)?.colour || Colours.primary},
             ]}
           />
           <View style={styles.taskCardMainContent}>
@@ -184,31 +241,74 @@ export default function TaskScreen() {
     );
   };
 
-  const addTask = (taskSelected, dateSelected) => {
+  const addTask = async (taskSelected, dateSelected) => {
     if (!taskSelected.trim()) {
-      alert("Please enter a task name!");
+      Alert.alert("Please enter a task name!");
       return;
     }
-    const newId = tasks.length
-      ? Math.max(...tasks.map((task) => Number(task.id))) + 1
-      : 1;
 
-    const newTask = {
-      id: newId.toString(),
-      title: taskSelected,
-      dueDate: dateSelected ? dateSelected.toISOString().split('T')[0] : "",
-      difficulty,
+    if (!selectedGroupT) {
+      Alert.alert("Please select a group");
+      return;
+    }
+
+    console.log("Creating initial task")
+
+    const result = await createTaskDB({
+      title: taskSelected.trim(),
       description: taskDescription,
-      groupId: selectedGroupT?.id || null,
-      completed: false,
-    };
+      dueDate: dateSelected ? dateSelected.toISOString().split('T')[0] : "",
+      difficulty: difficulty,
+      groupId: selectedGroupT.id,
+      createdBy: userId,
+    });
 
-    setTasks((prevTasks) => [...prevTasks, newTask]);
-    setShowAddTaskModal(false);
-    setTaskName("");
-    setTaskDate(new Date());
-    setTaskTime(new Date());
+    if (result.success) {
+      console.log("Task created with ID:", result.taskId);
+
+      const newTask = {
+        id: result.taskId,
+        title: taskSelected.trim(),
+        dueDate: dateSelected ? dateSelected.toISOString().split('T')[0] : "",
+        difficulty,
+        description: taskDescription,
+        groupId: selectedGroupT.id,
+        completedAt: [],
+        completedBy: [],
+        deletedBy: [],
+        completed: false,
+      };
+
+      setTasks((prevTasks) => [...prevTasks, newTask]);
+
+      setShowAddTaskModal(false);
+      setTaskName("");
+      setTaskDate(new Date());
+      setTaskTime(new Date());
+      setTaskDescription("");
+      setDifficulty("Easy");
+      setSelectedGroupT(null);
+      setHasDueDate(false);
+
+      showAlertText("Task created successfully!");
+    } else {
+      console.error("Error creating task:", result.error);
+      Alert.alert("Error", result.error);
+    }
   };
+
+  const remainingTasksSorted = filteredTasks.sort((a, b) => {
+    if (!a.dueDate && !b.dueDate) return 0;
+    if (!a.dueDate) return 1;
+    if (!b.dueDate) return -1;
+    return new Date(a.dueDate) - new Date(b.dueDate);
+  });
+  const completedTasksSorted = filteredCompletedTasks.sort((a, b) => {
+    if (!a.dueDate && !b.dueDate) return 0;
+    if (!a.dueDate) return 1;
+    if (!b.dueDate) return -1;
+    return new Date(a.dueDate) - new Date(b.dueDate);
+  });
 
   return (
     <View style={styles.entire}>
@@ -292,7 +392,7 @@ export default function TaskScreen() {
             </View>
           </View>
           
-          <FlatList data={filteredTasks} keyExtractor={(item) => item.id.toString()} renderItem={({ item }) => renderTask(item)} ListEmptyComponent={
+          <FlatList data={remainingTasksSorted} keyExtractor={(item) => item.id.toString()} renderItem={({ item }) => renderTask(item)} ListEmptyComponent={
               <Text style={{ width: "100%", textAlign: "center"}}>
                 No tasks left!
               </Text>}
@@ -343,7 +443,7 @@ export default function TaskScreen() {
               </View>
             </View>
           </View>
-           <FlatList data={filteredCompletedTasks} keyExtractor={(item) => item.id.toString()} renderItem={({ item }) => renderTask(item)} ListEmptyComponent={
+           <FlatList data={completedTasksSorted} keyExtractor={(item) => item.id.toString()} renderItem={({ item }) => renderTask(item)} ListEmptyComponent={
               <Text style={{ width: "100%", textAlign: "center"}}>
                 No tasks left!
               </Text>}
@@ -389,15 +489,6 @@ export default function TaskScreen() {
                     <Text>{taskDate.toDateString()}</Text>
                   </TouchableOpacity>
                 </View>
-
-                <View style={styles.popupPicker}>
-                  <Text style={styles.popupInfo}>Time*</Text>
-                  <TouchableOpacity style={styles.inpType} onPress={() => setShowTimePicker(true)}>
-                    <Text>
-                      {taskTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
               </View>
             )}
 
@@ -412,22 +503,27 @@ export default function TaskScreen() {
 
             <Text style={styles.popupInfo}>Group*</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginVertical: 10}}>
-              {groups.map((group) => (
-                <TouchableOpacity key={group.id} style={[styles.iconOption, selectedGroupT?.id === group.id && styles.iconSelected, {backgroundColor: group.colour}, ]} onPress={() => setSelectedGroupT(group)}>
-                  <Ionicons name={group.icon} size={26} color="white"></Ionicons>
-                </TouchableOpacity>))}
+              {myGroups.map((group) => (
+                <View key={group.id} style={{ alignItems: 'center', marginRight: 15 }}>
+                  <TouchableOpacity style={[styles.iconOption, selectedGroupT?.id === group.id && styles.iconSelected, {backgroundColor: group.colour}]} onPress={() => setSelectedGroupT(group)}>
+                    <Ionicons name={group.icon} size={26} color="white"></Ionicons>
+                  </TouchableOpacity>
+                  
+                  {selectedGroupT?.id === group.id && (<Text style={{ marginTop: 4, fontSize: 11, color: selectedGroupT.colour,fontWeight: '500', marginRight: 10}}numberOfLines={1}>{group.name}</Text>)}
+                </View>
+              ))}
             </ScrollView>
+
 
             <Text style={styles.popupInfo}>Description</Text>
             <TextInput style={[styles.textInp, { height: 80, textAlignVertical: "top" }]} placeholder="Add more details..." placeholderTextColor={Colours.textSecondary} value={taskDescription} onChangeText={setTaskDescription}multiline/>
 
-            <TouchableOpacity style={styles.addButton} onPress={() => addTask(taskName, hasDueDate ? taskDate : null, hasDueDate ? taskTime : null, difficulty, selectedGroupT, taskDescription)}>
+            <TouchableOpacity style={styles.addButton} onPress={() => addTask(taskName, hasDueDate ? taskDate : null, difficulty, selectedGroupT, taskDescription)}>
               <Text style={styles.addText}>Add Task</Text>
               <AntDesign name="enter" color={Colours.primaryText} size={24} />
             </TouchableOpacity>
 
-            {showDatePicker && ( <DateTimePicker value={taskDate} mode="date" display={Platform.OS === "ios" ? "spinner" : "default"} onChange={(event, selectedDate) => {setShowDatePicker(false); if (selectedDate) setTaskDate(selectedDate);}}/>)}
-            {showTimePicker && ( <DateTimePicker value={taskTime} mode="time" is24Hour={true} display={Platform.OS === "ios" ? "spinner" : "default"} onChange={(event, selectedTime) => { setShowTimePicker(false); if (selectedTime) setTaskTime(selectedTime); }} />)}
+            {showDatePicker && ( <DateTimePicker value={taskDate} mode="date" display={Platform.OS === "ios" ? "spinner" : "default"} minimumDate={new Date()} onChange={(event, selectedDate) => {setShowDatePicker(false); if (selectedDate) setTaskDate(selectedDate);}}/>)}
           </View>
         </View>
       </Modal>
@@ -462,8 +558,8 @@ export default function TaskScreen() {
                 <View style={styles.modalRow}>
                   <Text style={styles.modalLabel}>Group:</Text>
                   <View style={{flexDirection:"row", alignItems:"center"}}>
-                    <View style={{width:15, height:15, borderRadius:4, backgroundColor: groups.find(g=>g.id===selectedTask.groupId)?.colour || "#ccc", marginRight:8}}/>
-                    <Text style={styles.modalValue}>{groups.find(g=>g.id===selectedTask.groupId)?.name || "No group assigned."}</Text>
+                    <View style={{width:15, height:15, borderRadius:4, backgroundColor: myGroups.find(g=>g.id===selectedTask.groupId)?.colour || "#ccc", marginRight:8}}/>
+                    <Text style={styles.modalValue}>{myGroups.find(g=>g.id===selectedTask.groupId)?.name || "No group assigned."}</Text>
                   </View>
                 </View>
 
@@ -483,7 +579,7 @@ export default function TaskScreen() {
             
           <View style={[styles.filterDropdown, {position: "absolute", top:filterButtonLayout.y + filterButtonLayout.height + 5, left: filterButtonLayout.x}]}>
             <ScrollView nestedScrollEnabled={true}>
-              {groups.map((group) => {
+              {myGroups.map((group) => {
                 const isSelected = selectedGroupFilter.includes(group.id);
                 return (
                   <TouchableOpacity key={group.id} style={{flexDirection: "row", alignItems: "center", paddingVertical: 12, paddingHorizontal: 10, borderBottomWidth: 1, borderBlockColor: "#eee"}} onPress={() => {
@@ -511,7 +607,7 @@ export default function TaskScreen() {
             
           <View style={[styles.filterDropdown, {position: "absolute", top:completedFilterButtonLayout.y + completedFilterButtonLayout.height + 5, left: completedFilterButtonLayout.x}]}>
             <ScrollView nestedScrollEnabled={true}>
-              {groups.map((group) => {
+              {myGroups.map((group) => {
                 const isSelected = selectedCompletedGroupFilter.includes(group.id);
                 return (
                   <TouchableOpacity key={group.id} style={{flexDirection: "row", alignItems: "center", paddingVertical: 12, paddingHorizontal: 10, borderBottomWidth: 1, borderBlockColor: "#eee"}} onPress={() => {

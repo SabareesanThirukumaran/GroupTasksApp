@@ -40,9 +40,11 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     backgroundColor: "#0F6EC6",
-    padding: 12,
+    padding: 60,
     zIndex: 1000,
     alignItems: "center",
+    borderBottomLeftRadius: 15,
+    borderBottomRightRadius: 15,
   },
   
   toastText: {

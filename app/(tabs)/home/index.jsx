@@ -1,57 +1,27 @@
-import {useState} from "react";
-import { View, StyleSheet, Dimensions, Text, TouchableOpacity, Modal, TextInput, Alert } from "react-native";
+import {useEffect, useState, useCallback} from "react";
+import { useFocusEffect } from "@react-navigation/native";
+import { View, StyleSheet, Dimensions, Text, TouchableOpacity, Modal, TextInput, Alert, Platform } from "react-native";
 import { ScrollView, Switch } from "react-native-gesture-handler";
 import Svg, { Path, G, Circle} from "react-native-svg";
-import { Color as Colours } from "../../constants/colors";
+import { Color as Colours } from "../../../constants/colors";
 import { AntDesign, FontAwesome, Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import ToastAlert from "../../toastAlert";
-const width = Dimensions.get("window").width;
+import ToastAlert from "../../../toastAlert";
+import { signOut } from "firebase/auth";
+import { auth } from "../../../firebase/config";
+import {useAuth} from "../../../context/AuthContext";
+import { ActivityIndicator } from "react-native";
 const height = Dimensions.get("window").height;
+const width = Dimensions.get("window").width;
+import {useData} from "../../../context/DataContext"
+import LoadingScreen from "../../../components/loadingScreen"
+import { createGroup as createGroupDB, createTask as createTaskDB, leaveGroup as leaveGroupDB } from "../../../firebase/firebaseService";
 
 export default function Home() {
+  const {user, userData, loading: authLoading} = useAuth();
   const router = useRouter();
-  const userId = 1;
-
-  const [tasks, setTasks] = useState([
-    { id: '1', title: 'Task 1', dueDate: '2024-06-10', difficulty: 'Easy', description: "Hello my name is", groupId: 1, completed: false  },
-    { id: '2', title: 'Task 2', dueDate: '2024-06-12',  difficulty: 'Medium', description: "Hello my name is", groupId: 1, completed: true  },
-    { id: '3', title: 'Task 3', dueDate: '2024-06-15', difficulty: 'Hard', description: "Hello my name is", groupId: 3, completed: false  },
-    { id: '4', title: 'Task 4', dueDate: '', difficulty: 'Hard', description: "Hello my name is", groupId: 2, completed: false  },
-  ]);
-  const [allGroups, setAllGroups] = useState([
-    {
-    id: 1, name: "Study Group", 
-    membersList: [      
-      { id: 1, name: "Alice" },
-      { id: 2, name: "Ben" },
-      { id: 3, name: "Chris" },],
-       colour: Colours.groupColours[0], icon: "book", tasksDone: 15, percent: 65, tasks:23, type: "Public", code:"KG3BN8L9", creatorId: 3},
-    {id: 2, name: "Dorm Group",
-      membersList: [      
-      { id: 1, name: "Alice" },
-      { id: 2, name: "Ben" },
-      { id: 3, name: "Chris" },], colour: Colours.groupColours[2], icon: "people-sharp", tasksDone: 15, percent: 65, tasks:23, type: "Public", code:"5HRT9X2Q", creatorId: 1},
-    {id: 3, name: "Book Group",
-      membersList: [      
-      { id: 1, name: "Alice" },
-      { id: 2, name: "Ben" },
-      { id: 3, name: "Chris" },], colour: Colours.groupColours[1], icon: "book", tasksDone: 15, percent: 65, tasks:23, type: "Public", code: "8DF2S7LT", creatorId: 2},
-  ]);
-  const [myGroups, setMyGroups] = useState([
-    {id: 2, name: "Dorm Group",
-    membersList: [   
-      { id: 1, name: "You" },   
-      { id: 2, name: "Alice" },
-      { id: 3, name: "Ben" },
-      { id: 4, name: "Chris" },], colour: Colours.groupColours[2], icon: "people-sharp", tasksDone: 15, percent: 65, tasks:23, type: "Public", code:"5HRT9X2Q", creatorId: 1},
-    {id: 3, name: "Book Group",
-    membersList: [      
-      { id: 2, name: "Alice" },
-      { id: 3, name: "Ben" },
-      { id: 4, name: "Chris" },], colour: Colours.groupColours[1], icon: "book", tasksDone: 15, percent: 65, tasks:23, type: "Public", code: "8DF2S7LT", creatorId: 2},
-  ]);
+  const { tasks, setTasks, allGroups, setAllGroups, myGroups, setMyGroups, loading: dataLoading, loadingProgress } = useData();
 
   const [showAddTaskModal, setShowAddTaskModal] = useState(false);
   const [taskName, setTaskName] = useState("");
@@ -71,23 +41,101 @@ export default function Home() {
   const [selectedColour, setSelectedColour] = useState(Colours.groupColours[0]);
 
   const [showStatsModal, setShowStatsModal] = useState(false);
-  const totalTasks = 12;
-  const tasksCompleted = 8;
-  const groupsJoined = 3;
-  const mostActiveGroup = "Math Club";
-  const leastActiveGroup = "Science Club";
 
   const [showRecentGroup, setShowRecentGroup] = useState(false);
-  const [selectedGroup, setSelectedGroup] = useState(null);
-
-  const totalMembers = myGroups.reduce((sum, group) => group.creatorId === userId ? sum + group.membersList.length : sum, 0);
-  const progressPercentage = tasks.length > 0 ? tasks.filter((task) => task.completed).length / tasks.length  * 100 : 0;
+  const [selectedGroupId, setSelectedGroupId] = useState(null);
 
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertMessage, setAlertMessage] = useState("");
   const showAlertText = (message) => {setAlertMessage(message); setAlertVisible(true);}
 
-  let renderTask = (task, index) => {
+  if (authLoading || dataLoading) {
+    return <LoadingScreen progress={loadingProgress} />;
+  }
+
+  if (!user || !userData) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
+        <Text style={{ marginTop: 10, color: "#666" }}>Please log in</Text>
+      </View>
+    );
+  }
+
+  const userId = user.uid;
+  const totalMembers = myGroups.reduce((sum, group) => group.creatorId === userId ? sum + group.membersList.length : sum, 0);
+  const progressPercentage = tasks.length > 0 ? tasks.filter((task) => task.completed).length / tasks.length  * 100 : 0;
+
+  const tasksCompleted = tasks.filter((task) => task.completedBy && task.completedBy.includes(user.uid)).length
+  const groupsJoined = myGroups.length;
+  const totalTasks = tasks.length;
+  const groupsWithProgress = myGroups.map(group => {
+    const totalTasks = tasks.filter((task) => task.groupId === group.id).length
+    const taskCompletedCount = tasks.filter((task) => task.groupId === group.id && task.completedBy?.includes(userId)).length
+    const percent = totalTasks > 0 ? Math.round((taskCompletedCount / totalTasks) * 100) : 0;
+
+    return {
+      ...group,
+      totalTasks,
+      taskCompletedCount,
+      percent
+    }
+  });
+
+  const calculateGroupActivity = () => {
+    if (myGroups.length === 0) {
+      return {mostActiveGroup: "N/A", leastActiveGroup: "N/A"}
+    }
+
+    const groupActivity = myGroups.map(group => {
+      const groupTasks = tasks.filter((task) => task.groupId === group.id);
+
+      if (groupTasks.length === 0) {
+        return {
+          groupName: group.name,
+          lastTaskDate: null,
+          taskCount: 0
+        }
+      }
+
+      const mostRecentTask = groupTasks.reduce((latest, task) => {
+        const taskDate = task.createdAt?.toDate ? task.createdAt.toDate() : new Date(task.createdAt)
+        const latestDate = latest.createdAt?.toDate ? latest.createdAt.toDate() : new Date(latest.createdAt)
+        return taskDate > latestDate ? task : latest;
+      })
+
+      const lastTaskDate = mostRecentTask.createdAt?.toDate ? mostRecentTask.createdAt.toDate() : new Date(mostRecentTask.createdAt);
+
+      return {
+        groupName: group.name,
+        lastTaskDate: lastTaskDate,
+        taskCount: groupTasks.length
+      }
+
+    })
+
+    const sorted = groupActivity.sort((groupA, groupB) => {
+      if (!groupA.lastTaskDate) return 1;
+      if (!groupB.lastTaskDate) return -1;
+      return groupB.lastTaskDate - groupA.lastTaskDate
+    })
+
+    const mostActive = sorted[0]?.groupName || "N/A";
+    const leastActive = sorted[sorted.length - 1]?.groupName || "N/A";
+
+    return { mostActiveGroup: mostActive, leastActiveGroup: leastActive };
+  }
+  const {mostActiveGroup, leastActiveGroup} = calculateGroupActivity()
+
+  let handleLogout = async () => {
+    try {
+      await signOut(auth);
+      console.log("Logged out Successfully");
+    } catch (error) {
+      Alert.alert("Error", error.message)
+    }
+  }
+
+  let renderTask = (task, index, isLastInList) => {
     const difficultyStyleMap = {
       Easy: {
         backgroundColor: Colours.success + "55",
@@ -101,12 +149,11 @@ export default function Home() {
 
     };
 
-    const isLast = index === 1;
-
     return (
       <View key={task.id} style={styles.taskCard}>
+        <View style={[ styles.taskCardGroupIndicator,{ backgroundColor: myGroups.find((group) => group.id === task.groupId)?.colour || Colours.primary},]}/>
         
-        <View style={[styles.taskCardInner, isLast && { borderBottomWidth: 0}]}>
+        <View style={[styles.taskCardInner, isLastInList && { borderBottomWidth: 0}]}>
           <View style={styles.taskLeft}>
             <Text style={styles.taskCardName}>{task.title}</Text>
             <Text style={styles.taskCardDate}>Due {task.dueDate}</Text>
@@ -122,10 +169,12 @@ export default function Home() {
   }
 
   let renderGroup = (group, index) => {
-    const isLast = index === tasks.length - 1;
+    const isLast = index === myGroups.length - 1;
 
     return (
-      <TouchableOpacity key={group.id} style={styles.groupCard} onPress={() => {setShowRecentGroup(true); setSelectedGroup(group)}}>
+      <TouchableOpacity key={group.id} style={styles.groupCard} onPress={() => {
+        setShowRecentGroup(true); 
+        setSelectedGroupId(group.id)}}>
 
         <View style={[styles.groupMain, {backgroundColor: group.colour}]}>
           <Ionicons name={group.icon} size={24} color={"#fff"}></Ionicons>
@@ -136,48 +185,98 @@ export default function Home() {
     )
   }
 
-  const addTask = (taskSelected, dateSelected) => {
+  const addTask = async (taskSelected, dateSelected) => {
     if (!taskSelected.trim()) {
-      alert("Please enter a task name!");
+      Alert.alert("Please enter a task name!");
       return;
     }
-    const newId = tasks.length
-      ? Math.max(...tasks.map((task) => Number(task.id))) + 1
-      : 1;
 
-    const newTask = {
-      id: newId.toString(),
-      title: taskSelected,
-      dueDate: dateSelected ? dateSelected.toISOString().split('T')[0] : "",
-      difficulty,
+    if (!selectedGroupT) {
+      Alert.alert("Please select a group");
+      return;
+    }
+
+    console.log("Creating initial task")
+
+    const result = await createTaskDB({
+      title: taskSelected.trim(),
       description: taskDescription,
-      groupId: selectedGroupT?.id || null,
-      completed: false,
-    };
+      dueDate: dateSelected ? dateSelected.toISOString().split('T')[0] : "",
+      difficulty: difficulty,
+      groupId: selectedGroupT.id,
+      createdBy: userId,
+    });
 
-    setTasks((prevTasks) => [...prevTasks, newTask]);
-    setShowAddTaskModal(false);
-    setTaskName("");
-    setTaskDate(new Date());
-    setTaskTime(new Date());
+    if (result.success) {
+      console.log("Task created with ID:", result.taskId);
+
+      const newTask = {
+        id: result.taskId,
+        title: taskSelected.trim(),
+        dueDate: dateSelected ? dateSelected.toISOString().split('T')[0] : "",
+        difficulty,
+        description: taskDescription,
+        groupId: selectedGroupT.id,
+        completedBy: [],
+        completed: false,
+      };
+
+      setTasks((prevTasks) => [...prevTasks, newTask]);
+
+      setShowAddTaskModal(false);
+      setTaskName("");
+      setTaskDate(new Date());
+      setTaskTime(new Date());
+      setTaskDescription("");
+      setDifficulty("Easy");
+      setSelectedGroupT(null);
+      setHasDueDate(false);
+
+      showAlertText("Task created successfully!");
+    } else {
+      console.error("Error creating task:", result.error);
+      Alert.alert("Error", result.error);
+    }
   };
 
-  const createGroup = (name, type, icon, colour) => {
+  const createGroup = async (name, type, icon, colour) => {
+    if (!name.trim()) {
+      Alert.alert("Error", "Please enter a group name!")
+      return;
+    }
+
     const code = Math.random().toString(36).substring(2, 10).toUpperCase();
+    console.log("Creating initial group")
+
+    const result = await createGroupDB (
+      {
+        name: name.trim() || "Untitled Group",
+        code: code,
+        colour: colour,
+        icon: icon,
+        type: type,
+      },
+      userId,
+      userData?.name || "You"
+    );
+
+    console.log("Firebase log :", result)
+
+    if (result.success) {
+      console.log("Successfully created group with ID", result.groupId)
+    }
 
     const newGroup = {
-      id: allGroups.length + 1,
-      name: name.trim() || "Untitled Group",
-      membersList: [{ id: userId, name: "You" }],
+      id: result.groupId,
+      name: name.trim(),
+      membersList: [{ id: userId, name: userData?.name || "You", role: "admin", joinedAt: new Date() }],
       colour: colour,
       icon: icon,
-      tasksDone: 0,
-      percent: 0,
-      tasks: 0,
       type: type,
       code: code,
       creatorId: userId,
     };
+
     setAllGroups([...allGroups, newGroup]);
     setMyGroups([...myGroups, newGroup]);
 
@@ -188,14 +287,11 @@ export default function Home() {
     setSelectedColour(Colours.groupColours[0]);
   }
 
-  const leaveGroup = (selectedGroupId) => {
-    if ((myGroups.find((group) => group.id === selectedGroupId)).membersList.length === 1) {
-      showAlertText("You are the only member in this group. You must delete the group instead.");
-      return;
-    }
+  const leaveGroup = async (selectedGroupId) => {
+    const groupLeaving = myGroups.find((group) => group.id === selectedGroupId)
 
-    if (myGroups.find((group) => group.id === selectedGroupId).creatorId === userId) {
-      showAlertText("You are the creator. You must delete the group instead.");
+    if (groupLeaving && groupLeaving.creatorId === user.uid) {
+      showAlertText("You are the owner of this group. You must delete the group instead");
       return;
     }
 
@@ -207,31 +303,47 @@ export default function Home() {
         {
           text: "Leave",
           style: "destructive",
-          onPress: () => {
+          onPress: async () => {
 
             if (!selectedGroupId) return;
-            setMyGroups(myGroups.filter((group) => group.id !== selectedGroupId));
 
-            const groupToLeave = allGroups.find((group) => group.id === selectedGroupId);
-            if (groupToLeave) {
-              const updatedGroup = {
-                ...groupToLeave,
-                membersList: groupToLeave.membersList.filter(member => member.id !== userId),
-              };
+            const result = await leaveGroupDB(selectedGroupId,user.uid)
 
-              setAllGroups(allGroups.map((g) =>
-                g.id === selectedGroupId ? updatedGroup : g
-              ));
+            if (result.success) {
+              console.log("Successfully left group")
+              setMyGroups(myGroups.filter((group) => group.id !== selectedGroupId));
 
-              setMyGroups(myGroups.filter((g) => g.id !== selectedGroupId));
+              const groupToLeave = allGroups.find((group) => group.id === selectedGroupId);
+              if (groupToLeave) {
+                const updatedGroup = {
+                  ...groupToLeave,
+                  membersList: groupToLeave.membersList.filter(member => member.id !== userId),
+                };
+
+                setAllGroups(allGroups.map((g) =>g.id === selectedGroupId ? updatedGroup : g));
+              }
+
+              setShowRecentGroup(false);
+              showAlertText("Successfully left the group");
+            } else {
+              Alert.alert("Error", result.error || "Failed to leave group")
             }
-            setShowRecentGroup(false);
+
           },
         },
       ]
     );
   };
 
+  const selectedGroup = groupsWithProgress.find(g => g.id === selectedGroupId);
+  const upcomingTasks = tasks.filter((task) => !task.completed).sort((a, b) => {
+    if (!a.dueDate && !b.dueDate) return 0;
+    if (!a.dueDate) return 1;
+    if (!b.dueDate) return -1;
+
+    return new Date(a.dueDate) - new Date(b.dueDate)
+  }).slice(0, 2)
+  
   return (
     <View style={styles.entire}>
       <ScrollView style={{ width: "100%", height: "100%" }}>
@@ -242,10 +354,12 @@ export default function Home() {
 
           <View style={styles.headerContent}>
               <View style={styles.headerText}>
-                <Text style={styles.greeting}>Welcome back, Sabs</Text>
+                <Text style={styles.greeting} numberOfLines={1} ellipsizeMode="tail">Welcome back, {userData?.name || 'User'}</Text>
                 <Text style={styles.overview}>Here's your overview</Text>
               </View>
-              <AntDesign name="logout" size={28} color={Colours.primaryText} style={styles.logout}></AntDesign>
+              <TouchableOpacity onPress={() => handleLogout()}>
+                <AntDesign name="logout" size={28} color={Colours.primaryText} style={styles.logout}></AntDesign>
+              </TouchableOpacity>
           </View>
         </View>
 
@@ -277,7 +391,7 @@ export default function Home() {
               <View style={styles.headerRow}>
                 <View style={styles.accentBarGroups} />
                 <Text style={styles.todayTaskText}>
-                  <FontAwesome name="group" size={18} color="#0F6EC6" /> Your Groups
+                  <FontAwesome name="group" size={18} color="#0F6EC6" /> Owned Groups
                 </Text>
               </View>
 
@@ -307,7 +421,7 @@ export default function Home() {
             </View>
 
             <View style={styles.userPercentage}>
-              <Text style={styles.userPercentageNum}>{progressPercentage}%</Text>
+              <Text style={styles.userPercentageNum}>{Math.round(progressPercentage)}%</Text>
               <Text style={styles.userPercentageText}>Tasks Completed</Text>
             </View>
 
@@ -341,10 +455,18 @@ export default function Home() {
             <Text style={styles.upcomingText}>Upcoming Tasks</Text>
 
             <View style={styles.taskContainer}>
-                {tasks.slice(0, 2).map((task, index) => renderTask(task, index))}
-                <TouchableOpacity onPress={() => router.push("/tasks")}>
-                  <Text style={styles.viewAllTasks}>View All Tasks <Ionicons name="arrow-forward-outline" size={15} color="#0F6EC6" /></Text>
-                </TouchableOpacity>
+              {upcomingTasks.length > 0 ? (
+                <>
+                  {upcomingTasks.map((task, index, array) => renderTask(task, index, index === array.length-1))}
+                  <TouchableOpacity onPress={() => router.push("/tasks")}>
+                    <Text style={styles.viewAllTasks}>View All Tasks <Ionicons name="arrow-forward-outline" size={15} color="#0F6EC6" /></Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <Text style={{ width: "100%", textAlign: "center", color: Colours.grayText, marginVertical: 20 }}>
+                  Create a task to get started
+                </Text>
+              )}
             </View>
           </View>
 
@@ -385,15 +507,6 @@ export default function Home() {
                     <Text>{taskDate.toDateString()}</Text>
                   </TouchableOpacity>
                 </View>
-
-                <View style={styles.popupPicker}>
-                  <Text style={styles.popupInfo}>Time*</Text>
-                  <TouchableOpacity style={styles.inpType} onPress={() => setShowTimePicker(true)}>
-                    <Text>
-                      {taskTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
               </View>
             )}
 
@@ -409,9 +522,14 @@ export default function Home() {
             <Text style={styles.popupInfo}>Group*</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginVertical: 10}}>
               {myGroups.map((group) => (
-                <TouchableOpacity key={group.id} style={[styles.iconOption, selectedGroupT?.id === group.id && styles.iconSelected, {backgroundColor: group.colour}, ]} onPress={() => setSelectedGroupT(group)}>
-                  <Ionicons name={group.icon} size={26} color="white"></Ionicons>
-                </TouchableOpacity>))}
+                <View key={group.id} style={{ alignItems: 'center', marginRight: 15 }}>
+                  <TouchableOpacity style={[styles.iconOption, selectedGroupT?.id === group.id && styles.iconSelected, {backgroundColor: group.colour}]} onPress={() => setSelectedGroupT(group)}>
+                    <Ionicons name={group.icon} size={26} color="white"></Ionicons>
+                  </TouchableOpacity>
+                  
+                  {selectedGroupT?.id === group.id && (<Text style={{ marginTop: 4, fontSize: 11, color: selectedGroupT.colour,fontWeight: '500', marginRight: 10}}numberOfLines={1}>{group.name}</Text>)}
+                </View>
+              ))}
             </ScrollView>
 
             <Text style={styles.popupInfo}>Description</Text>
@@ -422,8 +540,7 @@ export default function Home() {
               <AntDesign name="enter" color={Colours.primaryText} size={24} />
             </TouchableOpacity>
 
-            {showDatePicker && ( <DateTimePicker value={taskDate} mode="date" display="default" onChange={(event, selectedDate) => {setShowDatePicker(false); if (selectedDate) setTaskDate(selectedDate);}}/>)}
-            {showTimePicker && ( <DateTimePicker value={taskTime} mode="time" is24Hour={true} display="default" onChange={(event, selectedTime) => { setShowTimePicker(false); if (selectedTime) setTaskTime(selectedTime); }} />)}
+            {showDatePicker && ( <DateTimePicker value={taskDate} mode="date" display={Platform.OS === "ios" ? "spinner" : "default"} minimumDate={new Date()} onChange={(event, selectedDate) => {setShowDatePicker(false); if (selectedDate) setTaskDate(selectedDate);}}/>)}
           </View>
         </View>
       </Modal>
@@ -524,13 +641,13 @@ export default function Home() {
               <View style={[styles.statsCard, { backgroundColor: "#FFEBEE" }]}>
                 <Ionicons name="analytics-outline" size={24} color="#E53935" />
                 <Text style={styles.cardTitle}>Least Active</Text>
-                <Text style={styles.cardValue}>{leastActiveGroup}</Text>
+                <Text style={styles.cardValue} numberOfLines={1}>{leastActiveGroup}</Text>
               </View>
             </View>
 
             <View style={{ marginTop: 20 }}>
               <Text style={styles.sectionTitle}>Tasks Completed Per Group</Text>
-              {myGroups.map((group, idx) => (
+              {groupsWithProgress.map((group, idx) => (
                 <View key={idx} style={{ marginBottom: 15 }}>
                   <Text style={{ fontWeight: "600", color: Colours.defaultText, marginBottom: 5 }}>
                     {group.name} - {group.percent}%
@@ -847,6 +964,14 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: Colours.defaultText,
     marginBottom: 10,
+  },
+
+  taskCardGroupIndicator: {
+    width: 4,
+    borderRadius: 2,
+    marginRight: 12,
+    backgroundColor: Colours.primary,
+    alignSelf: "stretch",
   },
 
   taskContainer: {

@@ -1,55 +1,33 @@
-import {View,Text,StyleSheet,TouchableOpacity,FlatList,Modal,TextInput,Dimensions,Alert} from "react-native";
+import {View,Text,StyleSheet,TouchableOpacity,FlatList,Modal,TextInput,Dimensions,Alert, Platform} from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import * as Clipboard from "expo-clipboard";
 import { ScrollView, Switch } from "react-native-gesture-handler";
-import { Color as Colours } from "../../constants/colors";
+import { Color as Colours } from "../../../constants/colors";
 import { AntDesign, Ionicons, FontAwesome } from "@expo/vector-icons";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Fuse from "fuse.js";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import ToastAlert from "../../toastAlert";
+import ToastAlert from "../../../toastAlert";
+import { auth } from "../../../firebase/config";
+import {useAuth} from "../../../context/AuthContext";
+import { ActivityIndicator } from "react-native";
+import {
+  createGroup as createGroupDB,
+  createTask as createTaskDB,
+  leaveGroup as leaveGroupDB,
+  joinGroup as joinGroupDB,
+  kickMember as kickMemberDB,
+  deleteGroup,
+  changeSettings,
+  deleteTask as deleteTaskDB
+} from "../../../firebase/firebaseService";
 const width = Dimensions.get("window").width;
+import {useData} from "../../../context/DataContext";
+import LoadingScreen from "../../../components/loadingScreen";
 
 export default function GroupScreen() {
-  const userId = 1;
-
-  const [tasks, setTasks] = useState([
-    { id: '1', title: 'Task 1', dueDate: '2024-06-10', difficulty: 'Easy', description: "Hello my name is", groupId: 1, completed: false  },
-    { id: '2', title: 'Task 2', dueDate: '2024-06-12',  difficulty: 'Medium', description: "Hello my name is", groupId: 1, completed: true  },
-    { id: '3', title: 'Task 3', dueDate: '2024-06-15', difficulty: 'Hard', description: "Hello my name is", groupId: 3, completed: false  },
-    { id: '4', title: 'Task 4', dueDate: '', difficulty: 'Hard', description: "Hello my name is", groupId: 2, completed: true  },
-  ]);
-  const [allGroups, setAllGroups] = useState([
-    {
-    id: 1, name: "Study Group", 
-    membersList: [      
-      { id: 1, name: "Alice" },
-      { id: 2, name: "Ben" },
-      { id: 3, name: "Chris" },],
-       colour: Colours.groupColours[0], icon: "book", tasksDone: 15, percent: 65, tasks:23, type: "Public", code:"KG3BN8L9", creatorId: 3},
-    {id: 2, name: "Dorm Group",
-      membersList: [      
-      { id: 1, name: "Alice" },
-      { id: 2, name: "Ben" },
-      { id: 3, name: "Chris" },], colour: Colours.groupColours[2], icon: "people-sharp", tasksDone: 15, percent: 65, tasks:23, type: "Public", code:"5HRT9X2Q", creatorId: 1},
-    {id: 3, name: "Book Group",
-      membersList: [      
-      { id: 1, name: "Alice" },
-      { id: 2, name: "Ben" },
-      { id: 3, name: "Chris" },], colour: Colours.groupColours[1], icon: "book", tasksDone: 15, percent: 65, tasks:23, type: "Public", code: "8DF2S7LT", creatorId: 2},
-  ]);
-  const [myGroups, setMyGroups] = useState([
-    {id: 2, name: "Dorm Group",
-    membersList: [   
-      { id: 1, name: "You" },   
-      { id: 2, name: "Alice" },
-      { id: 3, name: "Ben" },
-      { id: 4, name: "Chris" },], colour: Colours.groupColours[2], icon: "people-sharp", tasksDone: 15, percent: 65, tasks:23, type: "Public", code:"5HRT9X2Q", creatorId: 1},
-    {id: 3, name: "Book Group",
-    membersList: [      
-      { id: 2, name: "Alice" },
-      { id: 3, name: "Ben" },
-      { id: 4, name: "Chris" },], colour: Colours.groupColours[1], icon: "book", tasksDone: 15, percent: 65, tasks:23, type: "Public", code: "8DF2S7LT", creatorId: 2},
-  ]);
+  const {user, userData, loading: authLoading} = useAuth();
+  const { tasks, setTasks, allGroups, setAllGroups, myGroups, setMyGroups, loading: dataLoading, loadingProgress } = useData();
 
   const [selectedGroup, setSelectedGroup] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
@@ -78,21 +56,61 @@ export default function GroupScreen() {
   const [editedGroupName, setEditedGroupName] = useState(selectedGroup?.name || "");
   const [selectedIconSet, setSelectedIconSet] = useState(selectedGroup?.icon || "people");
   const [selectedColourSet, setSelectedColourSet] = useState(selectedGroup?.colour || Colours.groupColours[0]);
+  const [selectedTypeSet, setSelectedTypeSet] = useState(selectedColour?.type || "Public")
 
-  const [groupsRem, setGroupsRem] = useState(myGroups);
+  const [showTasksModal, setShowTasksModal] = useState(false);
+  const [selectedTask, setSelectedTask] = useState(null);
+
+  const [groupsRem, setGroupsRem] = useState([]);
   const [groupSearchValue, setGroupSearchValue] = useState("");
-  const groupFuse = new Fuse(myGroups,{keys: ["name"]})
-  useEffect(() => {onGroupChangeSearch(groupSearchValue)}, [myGroups])
 
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertMessage, setAlertMessage] = useState("");
   const showAlertText = (message) => {setAlertMessage(message); setAlertVisible(true);}
 
+  const groupFuse = new Fuse(myGroups,{keys: ["name"]})
+  const onGroupChangeSearch = useCallback((newValue) => {
+    setGroupSearchValue(newValue);
+    if (!newValue || newValue.trim() === "") {
+      setGroupsRem(myGroups);
+      return;
+    }
+    let fuseSearchResults = groupFuse.search(newValue);
+    setGroupsRem(fuseSearchResults.map(({item}) => item));
+  }, [myGroups]);
+
+  useEffect(() => {setGroupsRem(myGroups)}, [myGroups]);
+
+  if (!user || !userData) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
+        <Text style={{ marginTop: 10, color: "#666" }}>Please log in</Text>
+      </View>
+    );
+  }
+
+  const userId = user.uid;
+  const groupsWithProgress = myGroups.map(group => {
+    const totalTasks = tasks.filter((task) => task.groupId === group.id).length
+    const taskCompletedCount = tasks.filter((task) => task.groupId === group.id && task.completedBy?.includes(userId)).length
+    const percent = totalTasks > 0 ? Math.round((taskCompletedCount / totalTasks) * 100) : 0;
+
+    return {
+      ...group,
+      totalTasks,
+      taskCompletedCount,
+      percent
+    }
+  });
+  const selectedGroupWithProgress = selectedGroup 
+    ? groupsWithProgress.find(g => g.id === selectedGroup.id) 
+    : null;
+
   const getGroupMembers = (group) => {
     return group.membersList.map(member => member.name);
-  };
+  }
 
-  const handleKickMember = (memberId) => {
+  const handleKickMember = async (memberId) => {
 
     Alert.alert(
       "Kick Member",
@@ -102,19 +120,29 @@ export default function GroupScreen() {
         {
           text: "Kick",
           style: "destructive",
-          onPress: () => {
-            const updatedGroup = {
-              ...selectedGroup,
-              membersList: selectedGroup.membersList.filter(m => m.id !== memberId),
-            };
-            updateGroupState(updatedGroup);
+          onPress: async () => {
+            const result = await kickMemberDB(selectedGroup.id, memberId)
+
+            if (result.success) {
+              const updatedGroup = {
+                ...selectedGroup,
+                membersList: selectedGroup.membersList.filter(m => m.id !== memberId),
+              };
+              updateGroupState(updatedGroup);
+              showAlertText("Member removed successfully")
+              setShowSettingsModal(false)
+            } else {
+              showAlertText("Error", result.error || "Failed to remove member")
+            }
+
+
           },
         },
       ]
     );
-  };
+  }
 
-  const handleDeleteGroup = () => {
+  const handleDeleteGroup = async () => {
     Alert.alert(
       "Delete Group",
       "This action cannot be undone. Delete this group?",
@@ -123,25 +151,43 @@ export default function GroupScreen() {
         {
           text: "Delete",
           style: "destructive",
-          onPress: () => {
-            setMyGroups(myGroups.filter((g) => g.id !== selectedGroup.id));
-            setShowSettingsModal(false);
+          onPress: async () => {
+            const result = await deleteGroup(selectedGroup.id)
+
+            if (result.success) {
+              setMyGroups(myGroups.filter((group) => group.id !== selectedGroup.id));
+              setAllGroups(allGroups.filter((group) => group.id !== selectedGroup.id));
+              setTasks(tasks.filter(task => task.groupId !== selectedGroup.id));
+              setShowSettingsModal(false);
+              setModalVisible(false);
+              setAlertMessage("Group deleted successfully")
+            } else {
+              setAlertMessage("Error", result.error || "Failed to delete group")
+            }
           },
         },
       ]
     );
-  };
+  }
 
-  const handleSaveGroupSettings = () => {
-    const updatedGroup = {
-      ...selectedGroup,
-      name: editedGroupName,
-      icon: selectedIconSet,
-      colour: selectedColourSet,
-    };
-    updateGroupState(updatedGroup);
-    setShowSettingsModal(false);
-  };
+  const handleSaveGroupSettings = async () => {
+
+    const updates = {name: editedGroupName, icon: selectedIconSet, colour: selectedColourSet, type: selectedTypeSet}
+    const result = await changeSettings(selectedGroup.id, updates)
+
+    if (result.success) {
+      const updatedGroup = {
+        ...selectedGroup,
+        ...updates
+      };
+      updateGroupState(updatedGroup);
+      setShowSettingsModal(false);
+      showAlertText("Settings changed successfully")
+    } else {
+      showAlertText('Error', result.error || "Failed to update group")
+    }
+
+  }
 
   const updateGroupState = (updatedGroup) => {
     setMyGroups(prev =>
@@ -151,7 +197,7 @@ export default function GroupScreen() {
       prev.map(g => g.id === updatedGroup.id ? updatedGroup : g)
     );
     setSelectedGroup(updatedGroup);
-  };
+  }
 
   const groupOpen = (group) => {
     setSelectedGroup(group)
@@ -185,22 +231,44 @@ export default function GroupScreen() {
     </TouchableOpacity>)
   }
 
-  const createGroup = (name, type, icon, colour) => {
+  const createGroup = async (name, type, icon, colour) => {
+    if (!name.trim()) {
+      Alert.alert("Error", "Please enter a group name!")
+      return;
+    }
+
     const code = Math.random().toString(36).substring(2, 10).toUpperCase();
+    console.log("Creating initial group")
+
+    const result = await createGroupDB (
+      {
+        name: name.trim() || "Untitled Group",
+        code: code,
+        colour: colour,
+        icon: icon,
+        type: type,
+      },
+      userId,
+      userData?.name || "You"
+    );
+
+    console.log("Firebase log :", result)
+
+    if (result.success) {
+      console.log("Successfully created group with ID", result.groupId)
+    }
 
     const newGroup = {
-      id: allGroups.length + 1,
-      name: name.trim() || "Untitled Group",
-      membersList: [{ id: userId, name: "You" }],
+      id: result.groupId,
+      name: name.trim(),
+      membersList: [{ id: userId, name: userData?.name || "You", role: "admin", joinedAt: new Date() }],
       colour: colour,
       icon: icon,
-      tasksDone: 0,
-      percent: 0,
-      tasks: 0,
       type: type,
       code: code,
       creatorId: userId,
     };
+
     setAllGroups([...allGroups, newGroup]);
     setMyGroups([...myGroups, newGroup]);
 
@@ -211,44 +279,56 @@ export default function GroupScreen() {
     setSelectedColour(Colours.groupColours[0]);
   }
 
-  const joinGroup = (inviteCode) => {
+  const joinGroup = async (inviteCode) => {
     const trimmedCode = inviteCode.trim().toUpperCase();
+
+    const alreadyJoined = myGroups?.some(group => group?.code === trimmedCode);
+    if (alreadyJoined) {
+      showAlertText("You are already a member of this group");
+      console.log("You are already a member of this group")
+      return;
+    }
+
     const findGroup = allGroups.find((group) => group.code === trimmedCode);
 
     if (!findGroup) {
       showAlertText("No Group Found");
-      return;
-    }
-
-    const alreadyJoined = myGroups.some((group) => group.id === findGroup.id);
-    if (alreadyJoined) {
-      showAlertText("You are already a member of this group");
+      console.log("No group found")
       return;
     }
 
     if (findGroup.type === "Private") {
-      showAlertText("This is a private group. Join back when the owner makes it public.");
+      showAlertText("This is a private group. Noone other than the owner is allowed.");
+      console.log("This is a private group")
       return;
     }
 
-    const updatedGroup = { ...findGroup, membersList: [...findGroup.membersList, { id: userId, name: "You" }] };
-    const updatedAllGroups = allGroups.map((group) => group.id === findGroup.id ? updatedGroup : group);
+    const result = await joinGroupDB(trimmedCode, userId, userData?.name || "You")
 
-    setMyGroups([...myGroups, updatedGroup]);
-    setAllGroups(updatedAllGroups);
-    showAlertText("Successfully joined the group!");
-    setShowJoinGroupModal(false);
-    setGroupIDJoin("");
+    if (result.success) {
+      showAlertText("Successfully joined group")
+      const updatedGroup = { ...findGroup, membersList: [...findGroup.membersList, { id: userId, name: userData?.name, role:"member", joinedAt: new Date() }] };
+      const updatedAllGroups = allGroups.map((group) => group.id === findGroup.id ? updatedGroup : group);
+
+      setMyGroups([...myGroups, updatedGroup]);
+      setAllGroups(updatedAllGroups);
+      showAlertText("Successfully joined the group!");
+      console.log("Successfully joined")
+      setShowJoinGroupModal(false);
+      setGroupIDJoin("");
+      
+    } else {
+      showAlertText(result.error)
+      console.log(result.error)
+    }
+
   }
 
-  const leaveGroup = (selectedGroupId) => {
-    if ((myGroups.find((group) => group.id === selectedGroupId)).membersList.length === 1) {
-      showAlertText("You are the only member in this group. You must delete the group instead.");
-      return;
-    }
+  const leaveGroup = async (selectedGroupId) => {
+    const groupLeaving = myGroups.find((group) => group.id === selectedGroupId)
 
-    if (myGroups.find((group) => group.id === selectedGroupId).creatorId === userId) {
-      showAlertText("You are the creator. You must delete the group instead.");
+    if (groupLeaving && groupLeaving.creatorId === user.uid) {
+      showAlertText("You are the owner of this group. You must delete the group instead");
       return;
     }
 
@@ -260,61 +340,95 @@ export default function GroupScreen() {
         {
           text: "Leave",
           style: "destructive",
-          onPress: () => {
+          onPress: async () => {
 
             if (!selectedGroupId) return;
-            setMyGroups(myGroups.filter((group) => group.id !== selectedGroupId));
 
-            const groupToLeave = allGroups.find((group) => group.id === selectedGroupId);
-            if (groupToLeave) {
-              const updatedGroup = {
-                ...groupToLeave,
-                membersList: Math.max(0, groupToLeave.members - 1),
-              };
-              setAllGroups(allGroups.map((g) =>
-                g.id === selectedGroupId ? updatedGroup : g
-              ));
+            const result = await leaveGroupDB(selectedGroupId,user.uid)
 
-              setMyGroups(myGroups.filter((g) => g.id !== selectedGroupId));
+            if (result.success) {
+              console.log("Successfully left group")
+              setMyGroups(myGroups.filter((group) => group.id !== selectedGroupId));
+
+              const groupToLeave = allGroups.find((group) => group.id === selectedGroupId);
+              if (groupToLeave) {
+                const updatedGroup = {
+                  ...groupToLeave,
+                  membersList: groupToLeave.membersList.filter(member => member.id !== userId),
+                };
+
+                setAllGroups(allGroups.map((g) =>g.id === selectedGroupId ? updatedGroup : g));
+              }
+
+              setModalVisible(false);
+              showAlertText("Successfully left the group");
+            } else {
+              Alert.alert("Error", result.error || "Failed to leave group")
             }
 
-            setModalVisible(false);
           },
         },
       ]
     );
-  };
+  }
 
   const copyCode = (code) => {
     Clipboard.setStringAsync(code);
     showAlertText("Invite code copied!");
   }
 
-  const addTask = (taskSelected, dateSelected) => {
+  const addTask = async (taskSelected, dateSelected) => {
     if (!taskSelected.trim()) {
-      showAlertText("Please enter a task name!");
+      Alert.alert("Please enter a task name!");
       return;
     }
-    const newId = tasks.length
-      ? Math.max(...tasks.map((task) => Number(task.id))) + 1
-      : 1;
 
-    const newTask = {
-      id: newId.toString(),
-      title: taskSelected,
-      dueDate: dateSelected ? dateSelected.toISOString().split('T')[0] : "",
-      difficulty,
+    if (!selectedGroupT) {
+      Alert.alert("Please select a group");
+      return;
+    }
+
+    console.log("Creating initial task")
+
+    const result = await createTaskDB({
+      title: taskSelected.trim(),
       description: taskDescription,
-      groupId: selectedGroupT?.id || null,
-      completed: false,
-    };
+      dueDate: dateSelected ? dateSelected.toISOString().split('T')[0] : "",
+      difficulty: difficulty,
+      groupId: selectedGroupT.id,
+      createdBy: userId,
+    });
 
-    setTasks((prevTasks) => [...prevTasks, newTask]);
-    setShowAddTaskModal(false);
-    setTaskName("");
-    setTaskDate(new Date());
-    setTaskTime(new Date());
-  };
+    if (result.success) {
+      console.log("Task created with ID:", result.taskId);
+
+      const newTask = {
+        id: result.taskId,
+        title: taskSelected.trim(),
+        dueDate: dateSelected ? dateSelected.toISOString().split('T')[0] : "",
+        difficulty,
+        description: taskDescription,
+        groupId: selectedGroupT.id,
+        completed: false,
+      };
+
+      setTasks((prevTasks) => [...prevTasks, newTask]);
+
+      setShowAddTaskModal(false);
+      setTaskName("");
+      setTaskDate(new Date());
+      setTaskTime(new Date());
+      setTaskDescription("");
+      setDifficulty("Easy");
+      setSelectedGroupT(null);
+      setHasDueDate(false);
+
+      showAlertText("Task created successfully!");
+    } else {
+      console.error("Error creating task:", result.error);
+      Alert.alert("Error", result.error);
+    }
+  }
 
   const openSettings = (group) => {
     setSelectedGroup(group);
@@ -324,14 +438,31 @@ export default function GroupScreen() {
     setShowSettingsModal(true);
   }
 
-  const onGroupChangeSearch = (newValue) => {
-    setGroupSearchValue(newValue);
-    if (newValue.trim() === "") {
-      setGroupsRem(myGroups);
-      return;
-    }
-    let fuseSearchResults = groupFuse.search(newValue);
-    setGroupsRem(fuseSearchResults.map(({item}) => item));
+  const openTask = (task) => {
+    setSelectedTask(task)
+    setShowTasksModal(true)
+  }
+
+  const handleDeleteTask = async (taskId) => {
+    Alert.alert('Delete Task', 'Are you sure you want to delete this task ?',
+      [
+        {text: "Cancel", style: "cancel"},
+        {text: "Delete", style: "destructive",
+          onPress: async () => {
+            const result = await deleteTaskDB(taskId);
+
+            if (result.success) {
+              setTasks(tasks.filter(task => task.id !== taskId));
+              setShowTasksModal(false);
+              setSelectedTask(null)
+              showAlertText("Task deleted successfully");
+            } else {
+              showAlertText("Failed to delete task");
+            }
+          }
+        }
+      ]
+    )
   }
 
   return (
@@ -369,7 +500,7 @@ export default function GroupScreen() {
 
       <Modal visible={modalVisible} animationType="slide" onRequestClose={() => setModalVisible(false)}>
         <View style={{ flex: 1, backgroundColor: Colours.background }}>
-          {selectedGroup && (
+          {selectedGroupWithProgress  && (
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.modalScrollContainer, {paddingBottom: 50}]}>
 
               <View style={styles.modalHeader}>
@@ -379,11 +510,11 @@ export default function GroupScreen() {
                 </TouchableOpacity>
 
                 <View style={{ alignItems: "center" }}>
-                  <Ionicons name={selectedGroup.icon} size={50} color="#fff" style={[{ marginBottom: 6 }, {backgroundColor: selectedGroup.colour}, {padding: 10}, {borderRadius: 16}]}/>
-                  <Text style={styles.modalHeaderText}>{selectedGroup.name}</Text>
-                  <Text style={styles.modalSubHeaderText}>{selectedGroup.membersList.length} Members</Text>
-                  <TouchableOpacity onPress={() => copyCode(selectedGroup.code)}>
-                    <Text style={{color: Colours.primary}}>Invite Code: {selectedGroup.code}</Text>
+                  <Ionicons name={selectedGroupWithProgress.icon} size={50} color="#fff" style={[{ marginBottom: 6 }, {backgroundColor: selectedGroupWithProgress.colour}, {padding: 10}, {borderRadius: 16}]}/>
+                  <Text style={styles.modalHeaderText}>{selectedGroupWithProgress.name}</Text>
+                  <Text style={styles.modalSubHeaderText}>{selectedGroupWithProgress.membersList.length} Members</Text>
+                  <TouchableOpacity onPress={() => copyCode(selectedGroupWithProgress.code)}>
+                    <Text style={{color: Colours.primary}}>Invite Code: {selectedGroupWithProgress.code}</Text>
                   </TouchableOpacity>
                 </View>
 
@@ -392,9 +523,9 @@ export default function GroupScreen() {
               <View style={styles.progressCard}>
                 <Text style={styles.progressTitle}>Overall Progress</Text>
                 <View style={styles.progressBar}>
-                  <View style={[styles.progressFill, { width: `${selectedGroup.percent}%` }]} />
+                  <View style={[styles.progressFill, { width: `${selectedGroupWithProgress.percent}%` }]} />
                 </View>
-                <Text style={styles.progressPercent}>{selectedGroup.percent}% Completed</Text>
+                <Text style={styles.progressPercent}>{selectedGroupWithProgress.percent}% Completed</Text>
               </View>
 
               <View style={styles.modalTasks}>
@@ -404,18 +535,18 @@ export default function GroupScreen() {
                 </View>
 
                 <View style={{paddingBottom: 80}}>
-                  <FlatList data={tasks.filter((task => task.groupId === selectedGroup.id))} keyExtractor={(item, index) => index.toString()} scrollEnabled={false} renderItem={({ item }) => (
-                    <View style={[{ flexDirection: 'row', alignItems: 'center' }, styles.taskItem, item.completed && styles.taskItemCompleted ]}>
+                  <FlatList data={tasks.filter((task => task.groupId === selectedGroupWithProgress.id))} keyExtractor={(item, index) => index.toString()} scrollEnabled={false} renderItem={({ item }) => (
+                    <TouchableOpacity style={[{ flexDirection: 'row', alignItems: 'center' }, styles.taskItem, item.completed && styles.taskItemCompleted ]} onPress={() => openTask(item)}>
                       <Text style={[styles.taskText, item.completed && styles.taskCompletedText]}>{item.title}</Text>
                       <View style={[styles.taskDifficulty, { backgroundColor: item.difficulty === 'Easy' ? 'green' : item.difficulty === 'Medium' ? 'orange' : 'red' }]} />
-                    </View>
+                    </TouchableOpacity>
                   )}/>
                 </View>
 
                 <TouchableOpacity
                   style={styles.addTaskButton}
                   onPress={() => {
-                    setSelectedGroupT(selectedGroup);
+                    setSelectedGroupT(selectedGroupWithProgress);
                     setShowAddTaskModal(true);
                   }}
                 >
@@ -430,7 +561,7 @@ export default function GroupScreen() {
                   <Text style={styles.modalSectionTitle}>Group Members</Text>
                 </View>
 
-                <FlatList data={getGroupMembers(selectedGroup)} horizontal showsHorizontalScrollIndicator={false} keyExtractor={(item, index) => index.toString()} renderItem={({ item, index }) => (
+                <FlatList data={getGroupMembers(selectedGroupWithProgress)} horizontal showsHorizontalScrollIndicator={false} keyExtractor={(item, index) => index.toString()} renderItem={({ item, index }) => (
                     <View style={styles.memberAvatar}>
                       <Ionicons name="person-circle" size={50} color={index % 2 === 0 ? Colours.primary : "#0b76e8"}/>
                       <Text style={styles.memberText}>{item}</Text>
@@ -439,7 +570,7 @@ export default function GroupScreen() {
                 />
               </View>
 
-              <TouchableOpacity style={styles.leaveGroup} onPress={() => leaveGroup(selectedGroup.id)}>
+              <TouchableOpacity style={styles.leaveGroup} onPress={() => leaveGroup(selectedGroupWithProgress.id)}>
                   <Text style={styles.leaveGroupText}>Leave Group</Text>
               </TouchableOpacity>
 
@@ -567,14 +698,6 @@ export default function GroupScreen() {
               ))}
             </View>
 
-            <Text style={styles.popupInfo}>Group*</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginVertical: 10}}>
-              {myGroups.map((group) => (
-                <TouchableOpacity key={group.id} style={[styles.iconOption, selectedGroupT?.id === group.id && styles.iconSelected, {backgroundColor: group.colour}, ]} onPress={() => setSelectedGroupT(group)}>
-                  <Ionicons name={group.icon} size={26} color="white"></Ionicons>
-                </TouchableOpacity>))}
-            </ScrollView>
-
             <Text style={styles.popupInfo}>Description</Text>
             <TextInput style={[styles.textInp, { height: 80, textAlignVertical: "top" }]} placeholder="Add more details..." placeholderTextColor={Colours.textSecondary} value={taskDescription} onChangeText={setTaskDescription}multiline/>
 
@@ -611,6 +734,17 @@ export default function GroupScreen() {
               ))}
             </ScrollView>
 
+            <Text style={styles.popupInfo}>Group Type</Text>
+            <View style={styles.pill}>
+              <TouchableOpacity style={[ styles.leftButton, selectedTypeSet === "Public" && styles.activeButton, ]} onPress={() => setSelectedTypeSet("Public")}>
+                <Text style={[ styles.pillText, groupType === "Public" && styles.activeText, ]}>Public</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={[ styles.rightButton, selectedTypeSet === "Private" && styles.activeButton, ]} onPress={() => setSelectedTypeSet("Private")}>
+                <Text style={[ styles.pillText, groupType === "Private" && styles.activeText, ]}>Private</Text>
+              </TouchableOpacity>
+            </View>
+
             <Text style={styles.popupInfo}>Change Group Colour</Text>
             <View style={styles.colorRow}>
               {Colours.groupColours.map((color) => (
@@ -643,6 +777,98 @@ export default function GroupScreen() {
 
           </View>
         </View>
+      </Modal>
+
+      <Modal visible={showTasksModal} animationType="fade" transparent={true} onRequestClose={() => setShowTasksModal(false)}>
+
+          <View style={styles.modalOverlay}>
+            <View style={styles.taskDetailsModal}>
+
+              <TouchableOpacity style={styles.close} onPress={() => setShowTasksModal(false)}>
+                <AntDesign name="close-circle" size={26} color="white" />
+              </TouchableOpacity>
+
+              {selectedTask && (
+                <>
+                  <Text style={styles.modalTitle}>{selectedTask.title}</Text>
+
+                  <View style={{alignSelf: "center", paddingHorizontal: 16, paddingVertical: 6, borderRadius: 20, backgroundColor: selectedTask.difficulty === "Easy" ? "#43a04720" : selectedTask.difficulty === "Medium" ? "#f57c0020" : "#e5393520", marginBottom: 20}}>
+                    <Text style={{fontSize: 14, fontWeight: "700", color: selectedTask.difficulty === 'Easy' ? '#43a047' : selectedTask.difficulty === 'Medium' ? '#f57c00' :'#e53935',}}>
+                      {selectedTask.difficulty}
+                    </Text>
+                  </View>
+
+                  <View style={styles.modalRow}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                      <Ionicons name="document-text-outline" size={18} color={Colours.primary} />
+                      <Text style={[styles.modalLabel, { marginLeft: 6, marginBottom: 0 }]}>Description</Text>
+                    </View>
+                    <Text style={styles.modalValue}>{selectedTask.description || "No description provided."}</Text>
+                  </View>
+
+                  <View style={styles.modalRow}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                      <Ionicons name="calendar-outline" size={18} color={Colours.primary} />
+                      <Text style={[styles.modalLabel, { marginLeft: 6, marginBottom: 0 }]}>Due Date</Text>
+                    </View>
+                    <Text style={styles.modalValue}>{selectedTask.dueDate || "No due date set"}</Text>
+                  </View>
+
+                  <View style={styles.modalRow}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                      <Ionicons name="person-outline" size={18} color={Colours.primary} />
+                      <Text style={[styles.modalLabel, { marginLeft: 6, marginBottom: 0 }]}>Created By</Text>
+                    </View>
+                    <Text style={styles.modalValue}>{selectedGroupWithProgress?.membersList?.find(m => m.id === selectedTask.createdBy)?.name || "Unknown"}</Text>
+                  </View>
+
+                  <View style={styles.modalRow}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+                      <Ionicons name="checkmark-done-circle-outline" size={18} color={Colours.primary} />
+                      <Text style={[styles.modalLabel, { marginLeft: 6, marginBottom: 0 }]}>Completed By</Text>
+                    </View>
+
+                    {selectedTask.completedBy && selectedTask.completedBy.length > 0 ? (
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 5 }}>
+                        {selectedTask.completedBy.map((memberId, index) => {
+                          const member = selectedGroupWithProgress?.membersList?.find(m => m.id === memberId);
+                          return (
+                            <View key={index} style={styles.memberAvatar}>
+                              <Ionicons name="person-circle" size={45} color={index % 2 === 0 ? Colours.primary : "#0b76e8"} />
+                              <Text style={[styles.memberText, { fontSize: 12 }]}>{member?.name || "Unknown"}</Text>
+                            </View>
+                          );
+                        })}
+                      </ScrollView>
+                    ) : (
+                      <View style={{backgroundColor: '#f5f5f5',padding: 15,borderRadius: 10,alignItems: 'center',marginTop: 5,}}>
+                        <Ionicons name="hourglass-outline" size={24} color={Colours.grayText} />
+                        <Text style={{color: Colours.grayText,fontSize: 14,marginTop: 6,textAlign: 'center',}}>No one has completed this task yet</Text>
+                      </View>
+                    )}
+
+
+                    <View style={{marginTop: 20,paddingVertical: 12,borderRadius: 12,backgroundColor: selectedTask.completed ? '#43a04715' : '#f57c0015',alignItems: 'center',}}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Ionicons name={selectedTask.completed ? "checkmark-circle" : "time-outline"} size={20} color={selectedTask.completed ? "#43a047" : "#f57c00"} />
+                        <Text style={{marginLeft: 8,fontSize: 15,fontWeight: '700',color: selectedTask.completed ? "#43a047" : "#f57c00",}}>{selectedTask.completed ? "Completed" : "In Progress"}</Text>
+                      </View>
+                    </View>
+                    
+                  </View>
+
+                  {selectedGroupWithProgress?.membersList?.find(m => m.id === userId)?.role === "admin" && (
+                    <TouchableOpacity style={styles.deleteTask} onPress={() => handleDeleteTask(selectedTask.id)}>
+                      <Text style={styles.deleteTaskText}>Delete Task</Text>
+                      <Ionicons name="trash-outline" size={20} color="white" />
+                    </TouchableOpacity>
+                  )}
+                </>
+              )}
+
+            </View>
+          </View>
+
       </Modal>
 
       <ToastAlert message={alertMessage} visible={alertVisible} onHide={() => setAlertVisible(false)}/>
@@ -943,6 +1169,28 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowRadius: 6,
     elevation: 6,
+  },
+  
+  DateTimePickers: {
+    width: "100%",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 10,
+  },
+
+  popupPicker: {
+    flex: 1,
+    marginHorizontal: 5,
+  },
+
+  inpType: {
+    backgroundColor: Colours.surface,
+    height: 50,
+    borderWidth: 1,
+    borderColor: "#e0e0e0",
+    borderRadius: 10,
+    justifyContent: "center",
+    paddingHorizontal: 15,
   },
 
   // ---------------------
@@ -1357,4 +1605,25 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: Colours.defaultText,
   },
+
+  // =========================
+  // DELETE TASK STYLES
+  // =========================
+
+  deleteTask: {
+    backgroundColor: Colours.failure + "AA",
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    padding: 15,
+    gap: 10,
+  },
+
+  deleteTaskText: {
+    color: Colours.secondaryText,
+    fontWeight: 800,
+    fontSize: 18,
+  },
+
 });
