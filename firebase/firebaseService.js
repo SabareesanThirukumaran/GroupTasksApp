@@ -114,7 +114,7 @@ export const uploadProfilePicture = async (userId, uri) => {
         const blob = await response.blob();
 
         const filename = `profile_${userId}_${Date.now()}.jpg`;
-        const imageRef = storageRef(storage, `profile_pictures/${filename}`);
+        const imageRef = ref(storage, `profile_pictures/${filename}`);
 
         await uploadBytes(imageRef, blob)
         const downloadUrl = await getDownloadURL(imageRef)
@@ -131,6 +131,20 @@ export const updateUserProfile = async (userId, updates) => {
         await updateDoc(doc(db, 'users', userId), updates);
         return {success:true}
     } catch (error) {
+        return {success: false, error: error.message}
+    }
+}
+
+export const updatePushToken = async (userId, pushToken) => {
+    try {
+        const userRef = doc(db, 'users', userId);
+        await updateDoc(userRef, {
+            pushToken,
+            pushTokenUpdatedAt: new Date(),
+        })
+        return {sucess: true};
+    } catch (error) {
+        console.error("Error updating push token: ", error)
         return {success: false, error: error.message}
     }
 }

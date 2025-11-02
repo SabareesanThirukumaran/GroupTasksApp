@@ -1,20 +1,21 @@
-import {View,Text,StyleSheet,TouchableOpacity,FlatList,Modal,TextInput,Platform} from "react-native";
-import { useFocusEffect } from "@react-navigation/native";
+import {View,Text,StyleSheet,TouchableOpacity,FlatList,Modal,TextInput,Platform, Alert} from "react-native";
 import { ScrollView, Swipeable, Switch } from "react-native-gesture-handler";
-import {Color as Colours } from "../../../constants/colors";
+import { useTheme } from "../../../context/ThemeContext";
 import { AntDesign, Ionicons, FontAwesome } from "@expo/vector-icons";
 import React, { useEffect, useRef, useState, useCallback } from "react";
+import * as Notifications from 'expo-notifications'
 import DateTimePicker from "@react-native-community/datetimepicker";
 import Fuse from "fuse.js";
 import { useRouter } from "expo-router";
 import {useAuth} from "../../../context/AuthContext";
-import { ActivityIndicator } from "react-native";
 import {createTask as createTaskDB, updateTask as updateTaskDB} from "../../../firebase/firebaseService";
 import {useData} from "../../../context/DataContext";
 import LoadingScreen from "../../../components/loadingScreen";
+import {scheduleTaskDeadlineNotification, cancelTaskNotifications} from '../../../services/notificationService'
 
 export default function TaskScreen() {
   const {user, userData, loading: authLoading} = useAuth();
+  const {theme} = useTheme()
   const router = useRouter();
   const { tasks, setTasks, allGroups, myGroups, loading: dataLoading, loadingProgress } = useData();
 
@@ -51,6 +52,9 @@ export default function TaskScreen() {
   const filterButtonRef = useRef(null);
   const completedFilterButtonRef = useRef(null);
   const canSwipeRef = useRef({})
+
+  const notificationListener = useRef();
+  const responseListener = useRef();
 
   const showAlertText = (message) => {setAlertMessage(message); setAlertVisible(true);}
 
@@ -97,14 +101,37 @@ export default function TaskScreen() {
     });
   }, [tasks]);
 
+  useEffect(() => {
+    const subscription1 = Notifications.addNotificationReceivedListener(notification => {
+      console.log('📬 Notification received in foreground:', notification);
+    });
+
+    const subscription2 = Notifications.addNotificationResponseReceivedListener(response => {
+      console.log('👆 Notification tapped:', response);
+      const taskId = response.notification.request.content.data?.taskId;
+      if (taskId) {
+        const task = tasks.find(t => t.id === taskId);
+        if (task) {
+          setSelectedTask(task);
+          setTaskModalVisible(true);
+        }
+      }
+    });
+
+    return () => {
+      subscription1.remove();
+      subscription2.remove();
+    };
+  }, [tasks]);
+
   if (authLoading || dataLoading) {
     return <LoadingScreen progress={loadingProgress} />;
   }
 
   if (!user || !userData) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
-        <Text style={{ marginTop: 10, color: "#666" }}>Please log in</Text>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.background }}>
+        <Text style={{ marginTop: 10, color: theme.grayTex }}>Please wait / log in</Text>
       </View>
     );
   }
@@ -124,6 +151,8 @@ export default function TaskScreen() {
     const result = await updateTaskDB(id, updates)
 
     if (result.success) {
+      await cancelTaskNotifications(id);
+
       setTasks((prev) =>
         prev.map((task) =>
           task.id === id ? { ...task, completedBy: updates.completedBy, completed: true } : task
@@ -141,6 +170,8 @@ export default function TaskScreen() {
     const result = await updateTaskDB(id, updates)
 
     if (result.success) {
+      await cancelTaskNotifications(id);
+
       setTasks((prev) => prev.map((task) => task.id === id ? {...task, deletedBy: updates.deletedBy} : task));
     }
 
@@ -159,86 +190,85 @@ export default function TaskScreen() {
       <AntDesign
         name={!task.completed ? "check" : "close"}
         size={24}
-        color={Colours.primaryText}
+        color={theme.primaryText}
       />
     </TouchableOpacity>
   );
 
   const getDifficultyColor = (level) => {
-  switch(level){
-    case "Easy": return "#43a047";
-    case "Medium": return "#f57c00";
-    case "Hard": return "#e53935";
-    default: return Colours.defaultText;
-  }
+    switch(level){
+      case "Easy": return "#43a047";
+      case "Medium": return "#f57c00";
+      case "Hard": return "#e53935";
+      default: return theme.defaultText;
+    }
   };
 
   const renderTask = (task) => {
-    const difficultyStyleMap = {
-      Easy: {
-        backgroundColor: Colours.success + "55",
-        borderColor: Colours.success,
-      },
-      Medium: {
-        backgroundColor: Colours.lightWarning + "55",
-        borderColor: Colours.lightWarning,
-      },
-      Hard: {
-        backgroundColor: Colours.warning + "55",
-        borderColor: Colours.warning,
-      },
-    };
+      const difficultyStyleMap = {
+        "Easy": {
+          backgroundColor: theme.success + "55",
+          borderColor: theme.success,
+        },
+        "Medium": {
+          backgroundColor: theme.lightWarning + "55",
+          borderColor: theme.lightWarning,
+        },
+        "Hard": {
+          backgroundColor: theme.warning + "55",
+          borderColor: theme.warning,
+        },
+      };
 
-    if (task.deletedBy.includes(userId)) {
-      return
-    }
+      if (!task.deletedBy || task.deletedBy.includes(userId)) return null;
 
-    return (
-      <Swipeable
-        ref = {canSwipeRef.current[task.id]}
-        key={task.id}
-        renderRightActions={() => renderRightActions(task)}
-        childrenContainerStyle={styles.taskCard}
-        containerStyle={{width: "100%"}}
+      return (
+        <Swipeable
+          ref = {canSwipeRef.current[task.id]}
+          key={task.id}
+          renderRightActions={() => renderRightActions(task)}
+          childrenContainerStyle={[styles.taskCard, { backgroundColor: theme.surface, borderColor: theme.surfaceBorder }]}
+          containerStyle={{width: "100%"}}
 
-      >
-        <TouchableOpacity onPress={() => {
-          if (canSwipeRef.current) {
-            canSwipeRef.current[task.id]?.current?.close();
-          }
-          setSelectedTask(task);
-          setTaskModalVisible(true);
-        }} style={{ flexDirection: "row"}}>
-          <View
-            style={[
-              styles.taskCardGroupIndicator,
-              { backgroundColor: myGroups.find((group) => group.id === task.groupId)?.colour || Colours.primary},
-            ]}
-          />
-          <View style={styles.taskCardMainContent}>
-            <View style={styles.taskCardDetails}>
-              <Text
-                style={styles.taskCardName}
-                numberOfLines={1}
-                ellipsizeMode="tail"
-              >
-                {task.title}
-              </Text>
-              <Text style={styles.taskCardDescription}>{task.description}</Text>
+        >
+          <TouchableOpacity onPress={() => {
+            if (canSwipeRef.current) {
+              canSwipeRef.current[task.id]?.current?.close();
+            }
+            setSelectedTask(task);
+            setTaskModalVisible(true);
+          }} style={{ flexDirection: "row"}}>
+            <View
+              style={[
+                styles.taskCardGroupIndicator,
+                { backgroundColor: myGroups.find((group) => group.id === task.groupId)?.colour || theme.primary},
+              ]}
+            />
+            <View style={styles.taskCardMainContent}>
+              <View style={styles.taskCardDetails}>
+                <Text
+                  style={[styles.taskCardName, { color: theme.defaultText }]}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                >
+                  {task.title}
+                </Text>
+                <Text style={[styles.taskCardDescription, { color: theme.grayText }]}>{task.description}</Text>
+              </View>
             </View>
-          </View>
-          <View
-            style={[
-              styles.taskDifficultyContainer,
-              difficultyStyleMap[task.difficulty],
-            ]}
-          >
-            <Text>{task.difficulty}</Text>
-          </View>
-          <Text style={styles.dueDate}>Due : {task.dueDate ? task.dueDate : "No Due Date"}</Text>
-        </TouchableOpacity>
-      </Swipeable>
-    );
+            <View
+              style={[
+                styles.taskDifficultyContainer,
+                { backgroundColor: theme.background, borderColor: theme.surfaceBorder },
+                difficultyStyleMap[task.difficulty],
+              ]}
+            >
+              <Text style={{ color: theme.defaultText }}>{task.difficulty}</Text>
+            </View>
+            <Text style={[styles.dueDate, { color: theme.defaultText }]}>Due : {task.dueDate ? task.dueDate : "No Due Date"}</Text>
+          </TouchableOpacity>
+        </Swipeable>
+      );
   };
 
   const addTask = async (taskSelected, dateSelected) => {
@@ -252,8 +282,6 @@ export default function TaskScreen() {
       return;
     }
 
-    console.log("Creating initial task")
-
     const result = await createTaskDB({
       title: taskSelected.trim(),
       description: taskDescription,
@@ -264,7 +292,6 @@ export default function TaskScreen() {
     });
 
     if (result.success) {
-      console.log("Task created with ID:", result.taskId);
 
       const newTask = {
         id: result.taskId,
@@ -278,6 +305,10 @@ export default function TaskScreen() {
         deletedBy: [],
         completed: false,
       };
+
+      if (newTask.dueDate) {
+        await scheduleTaskDeadlineNotification(newTask);
+      }
 
       setTasks((prevTasks) => [...prevTasks, newTask]);
 
@@ -311,25 +342,25 @@ export default function TaskScreen() {
   });
 
   return (
-    <View style={styles.entire}>
+    <View style={[styles.entire, { backgroundColor: theme.background }]}>
       <ScrollView style={{ width: "100%", height: "100%" }}>
 
-        <View style={styles.topHeader}>
-          <Ionicons name="checkmark-done" color={Colours.primary} size={40}></Ionicons>
-          <Text style={styles.topHeaderText}>Tasks</Text>
+        <View style={[styles.topHeader, { backgroundColor: theme.surface }]}>
+          <Ionicons name="checkmark-done" color={theme.primary} size={40}></Ionicons>
+          <Text style={[styles.topHeaderText, { color: theme.defaultText }]}>Tasks</Text>
         </View>
 
-        <View style={styles.header}>
+        <View style={[styles.header, { backgroundColor: theme.background }]}>
           <View style={styles.taskCounter}>
             <View
               style={[
                 styles.taskCounterBar,
-                { backgroundColor: Colours.success },
+                { backgroundColor: theme.success },
               ]}
             />
             <View style={styles.taskCounterDetails}>
-              <Text style={styles.taskCounterText}>Completed</Text>
-              <Text style={styles.taskCount}>
+              <Text style={[styles.taskCounterText, { color: theme.defaultText }]}>Completed</Text>
+              <Text style={[styles.taskCount, { color: theme.defaultText }]}>
                 {(() => {
                   const completedTasks = tasks.filter((task) => task.completed);
                   return completedTasks.length;
@@ -341,12 +372,12 @@ export default function TaskScreen() {
             <View
               style={[
                 styles.taskCounterBar,
-                { backgroundColor: Colours.warning },
+                { backgroundColor: theme.warning },
               ]}
             />
             <View style={styles.taskCounterDetails}>
-              <Text style={styles.taskCounterText}>Remaining</Text>
-              <Text style={styles.taskCount}>
+              <Text style={[styles.taskCounterText, { color: theme.defaultText }]}>Remaining</Text>
+              <Text style={[styles.taskCount, { color: theme.defaultText }]}>
                 {(() => {
                   const remainingTasks = tasks.filter(
                     (task) => !task.completed
@@ -360,7 +391,7 @@ export default function TaskScreen() {
 
         <View style={styles.tasks}>
           <View style={styles.tasksLabelContainer}>
-            <Text style={styles.tasksLabel}>Remaining</Text>
+            <Text style={[styles.tasksLabel, { color: theme.defaultText }]}>Remaining</Text>
             <View style={styles.tasksLabelOptionsContainer}>
               <TouchableOpacity ref={filterButtonRef} style={styles.tasksLabelFilterButton} 
               onPress={() => {
@@ -370,19 +401,17 @@ export default function TaskScreen() {
                     setFilterModalVisible(true);
                   })
               }}}>
-                <Ionicons name="filter" size={24} color={Colours.defaultText} />
+                <Ionicons name="filter" size={24} color={theme.defaultText} />
               </TouchableOpacity>
-              <View style={styles.tasksSearchContainer}>
-                <FontAwesome name="search" size={24} color={Colours.defaultText}/>
+              <View style={[styles.tasksSearchContainer, { backgroundColor: theme.surface, borderColor: theme.surfaceBorder }]}>
+                <FontAwesome name="search" size={24} color={theme.defaultText}/>
                 <TextInput
                   placeholder="Search"
                   value={remainingSearchValue}
+                  placeholderTextColor={theme.grayText}
                   onChangeText={onRemainingChangeSearch}
                   style={{
-                    color:
-                      remainingSearchValue == ""
-                        ? Colours.grayText
-                        : Colours.defaultText,
+                    color: theme.defaultText,
                     fontSize: 18,
                     flex: 1,
                     minWidth: "80%",
@@ -393,7 +422,7 @@ export default function TaskScreen() {
           </View>
           
           <FlatList data={remainingTasksSorted} keyExtractor={(item) => item.id.toString()} renderItem={({ item }) => renderTask(item)} ListEmptyComponent={
-              <Text style={{ width: "100%", textAlign: "center"}}>
+              <Text style={{ width: "100%", textAlign: "center", color: theme.grayText}}>
                 No tasks left!
               </Text>}
             scrollEnabled={false}
@@ -405,6 +434,7 @@ export default function TaskScreen() {
             <Text
               style={[
                 styles.tasksLabel,
+                { color: theme.defaultText }
               ]}
             >
               Completed
@@ -418,23 +448,21 @@ export default function TaskScreen() {
                     setCompletedFilterModalVisible(true);
                   })
               }}}>
-                <Ionicons name="filter" size={24} color={Colours.defaultText} />
+                <Ionicons name="filter" size={24} color={theme.defaultText} />
               </TouchableOpacity>
-              <View style={styles.tasksSearchContainer}>
+              <View style={[styles.tasksSearchContainer, { backgroundColor: theme.surface, borderColor: theme.surfaceBorder }]}>
                 <FontAwesome
                   name="search"
                   size={24}
-                  color={Colours.defaultText}
+                  color={theme.defaultText}
                 />
                 <TextInput
                   placeholder="Search"
+                  placeholderTextColor={theme.grayText}
                   value={completedSearchValue}
                   onChangeText={onCompletedChangeSearch}
                   style={{
-                    color:
-                      completedSearchValue == ""
-                        ? Colours.grayText
-                        : Colours.defaultText,
+                    color: theme.defaultText,
                     fontSize: 18,
                     flex: 1,
                     minWidth: "80%",
@@ -444,7 +472,7 @@ export default function TaskScreen() {
             </View>
           </View>
            <FlatList data={completedTasksSorted} keyExtractor={(item) => item.id.toString()} renderItem={({ item }) => renderTask(item)} ListEmptyComponent={
-              <Text style={{ width: "100%", textAlign: "center"}}>
+              <Text style={{ width: "100%", textAlign: "center", color: theme.grayText}}>
                 No tasks left!
               </Text>}
             scrollEnabled={false}
@@ -454,54 +482,53 @@ export default function TaskScreen() {
       </ScrollView>
 
       <View style={styles.addTask}>
-        <TouchableOpacity style={styles.addBar} onPress={() => setShowAddTaskModal(true)}>
+        <TouchableOpacity style={[styles.addBar, { backgroundColor: theme.primary }]} onPress={() => setShowAddTaskModal(true)}>
           <AntDesign
             name="plus"
             size={45}
-            color={Colours.primaryText}
+            color={theme.primaryText}
           ></AntDesign>
         </TouchableOpacity>
       </View>
 
       <Modal visible={showAddTaskModal} animationType="fade" transparent={true} onRequestClose={() => setShowAddTaskModal(false)}>
         <View style={styles.popup}>
-          <View style={styles.popupBox}>
+          <View style={[styles.popupBox, { backgroundColor: theme.surface }]}>
             <TouchableOpacity style={styles.close} onPress={() => setShowAddTaskModal(false)}>
               <AntDesign name="close-circle" size={30} color="white"></AntDesign>
             </TouchableOpacity>
 
-            <Text style={styles.popupText}>Create Task</Text>
+            <Text style={[styles.popupText, { color: theme.defaultText }]}>Create Task</Text>
 
-
-            <Text style={styles.popupInfo}>Task*</Text>
-            <TextInput style={styles.textInp} placeholder="Complete Project..." placeholderTextColor={Colours.textSecondary} value={taskName} onChangeText={setTaskName}/>
+            <Text style={[styles.popupInfo, { color: theme.grayText }]}>Task*</Text>
+            <TextInput style={[styles.textInp, { backgroundColor: theme.surface, borderColor: theme.surfaceBorder, color: theme.defaultText }]} placeholder="Complete Project..." placeholderTextColor={theme.grayText} value={taskName} onChangeText={setTaskName}/>
 
             <View style={{ flexDirection: "row", alignItems: "center", marginVertical: 10 }}>
-              <Switch value={hasDueDate} onValueChange={setHasDueDate} thumbColor={hasDueDate ? Colours.primary : "#ccc"} trackColor={{ false: "#aaa", true: Colours.primary }}/>
-              <Text style={{ marginLeft: 10, color: Colours.defaultText, fontWeight: "600" }}>Add a due date?</Text>
+              <Switch value={hasDueDate} onValueChange={setHasDueDate} thumbColor={hasDueDate ? theme.primary : "#ccc"} trackColor={{ false: "#aaa", true: theme.primary }}/>
+              <Text style={{ marginLeft: 10, color: theme.defaultText, fontWeight: "600" }}>Add a due date?</Text>
             </View>
 
             {hasDueDate && (
               <View style={styles.DateTimePickers}>
                 <View style={styles.popupPicker}>
-                  <Text style={styles.popupInfo}>Date*</Text>
-                  <TouchableOpacity style={styles.inpType} onPress={() => setShowDatePicker(true)}>
-                    <Text>{taskDate.toDateString()}</Text>
+                  <Text style={[styles.popupInfo, { color: theme.grayText }]}>Date*</Text>
+                  <TouchableOpacity style={[styles.inpType, { backgroundColor: theme.surface, borderColor: theme.surfaceBorder }]} onPress={() => setShowDatePicker(true)}>
+                    <Text style={{color: theme.grayText}}>{taskDate.toDateString()}</Text>
                   </TouchableOpacity>
                 </View>
               </View>
             )}
 
-            <Text style={styles.popupInfo}>Difficulty</Text>
+            <Text style={[styles.popupInfo, { color: theme.grayText }]}>Difficulty</Text>
             <View style={styles.pill}>
               {['Easy', 'Medium', 'Hard'].map((level) => (
-                <TouchableOpacity key={level} style={[styles.pillButton, difficulty === level && styles.activeButton]} onPress={() => setDifficulty(level)}>
-                  <Text style={[styles.pillText, difficulty === level && styles.activeText]}>{level}</Text>
+                <TouchableOpacity key={level} style={[styles.pillButton, { backgroundColor: difficulty === level ? theme.primary : theme.surfaceBorder, borderColor: difficulty === level ? theme.primary : theme.secondary }]} onPress={() => setDifficulty(level)}>
+                  <Text style={[styles.pillText, { color: difficulty === level ? "white" : theme.defaultText }]}>{level}</Text>
                 </TouchableOpacity>
               ))}
             </View>
 
-            <Text style={styles.popupInfo}>Group*</Text>
+            <Text style={[styles.popupInfo, { color: theme.grayText }]}>Group*</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginVertical: 10}}>
               {myGroups.map((group) => (
                 <View key={group.id} style={{ alignItems: 'center', marginRight: 15 }}>
@@ -514,13 +541,12 @@ export default function TaskScreen() {
               ))}
             </ScrollView>
 
-
-            <Text style={styles.popupInfo}>Description</Text>
-            <TextInput style={[styles.textInp, { height: 80, textAlignVertical: "top" }]} placeholder="Add more details..." placeholderTextColor={Colours.textSecondary} value={taskDescription} onChangeText={setTaskDescription}multiline/>
+            <Text style={[styles.popupInfo, { color: theme.grayText }]}>Description</Text>
+            <TextInput style={[styles.textInp, { height: 80, textAlignVertical: "top", backgroundColor: theme.surface, borderColor: theme.surfaceBorder, color: theme.defaultText }]} placeholder="Add more details..." placeholderTextColor={theme.grayText} value={taskDescription} onChangeText={setTaskDescription}multiline/>
 
             <TouchableOpacity style={styles.addButton} onPress={() => addTask(taskName, hasDueDate ? taskDate : null, difficulty, selectedGroupT, taskDescription)}>
               <Text style={styles.addText}>Add Task</Text>
-              <AntDesign name="enter" color={Colours.primaryText} size={24} />
+              <AntDesign name="enter" color={theme.primaryText} size={24} />
             </TouchableOpacity>
 
             {showDatePicker && ( <DateTimePicker value={taskDate} mode="date" display={Platform.OS === "ios" ? "spinner" : "default"} minimumDate={new Date()} onChange={(event, selectedDate) => {setShowDatePicker(false); if (selectedDate) setTaskDate(selectedDate);}}/>)}
@@ -531,40 +557,40 @@ export default function TaskScreen() {
       <Modal visible={taskModalVisible} animationType="fade" transparent={true} onRequestClose={() => setTaskModalVisible(false)}>
         <View style={styles.modalOverlay}>
 
-          <View style={styles.taskDetailsModal}>
+          <View style={[styles.taskDetailsModal, { backgroundColor: theme.surface }]}>
             <TouchableOpacity style={styles.close} onPress={() => setTaskModalVisible(false)}>
               <AntDesign name="close-circle" size={30} color="white"></AntDesign>
             </TouchableOpacity>
 
             {selectedTask && (
               <>
-                <Text style={styles.modalTitle}>{selectedTask.title}</Text>
+                <Text style={[styles.modalTitle, { color: theme.primary }]}>{selectedTask.title}</Text>
 
                 <View style={styles.modalRow}>
-                  <Text style={[styles.modalLabel, { marginTop: 0 }]}>Description</Text>
-                  <Text style={styles.modalValue}>{selectedTask.description || "No description provided."}</Text>
+                  <Text style={[styles.modalLabel, { marginTop: 0, color: theme.grayText }]}>Description</Text>
+                  <Text style={[styles.modalValue, { color: theme.defaultText }]}>{selectedTask.description || "No description provided."}</Text>
                 </View>
 
                 <View style={styles.modalRow}>
-                  <Text style={styles.modalLabel}>Due Date:</Text>
-                  <Text style={styles.modalValue}>{selectedTask.dueDate || "No due date set."}</Text>
+                  <Text style={[styles.modalLabel, { color: theme.grayText }]}>Due Date:</Text>
+                  <Text style={[styles.modalValue, { color: theme.defaultText }]}>{selectedTask.dueDate || "No due date set."}</Text>
                 </View>
 
                 <View style={styles.modalRow}>
-                  <Text style={styles.modalLabel}>Difficulty:</Text>
+                  <Text style={[styles.modalLabel, { color: theme.grayText }]}>Difficulty:</Text>
                   <Text style={[styles.modalValue, {color: getDifficultyColor(selectedTask.difficulty)}]}>{selectedTask.difficulty}</Text>
                 </View>
 
                 <View style={styles.modalRow}>
-                  <Text style={styles.modalLabel}>Group:</Text>
+                  <Text style={[styles.modalLabel, { color: theme.grayText }]}>Group:</Text>
                   <View style={{flexDirection:"row", alignItems:"center"}}>
                     <View style={{width:15, height:15, borderRadius:4, backgroundColor: myGroups.find(g=>g.id===selectedTask.groupId)?.colour || "#ccc", marginRight:8}}/>
-                    <Text style={styles.modalValue}>{myGroups.find(g=>g.id===selectedTask.groupId)?.name || "No group assigned."}</Text>
+                    <Text style={[styles.modalValue, { color: theme.defaultText }]}>{myGroups.find(g=>g.id===selectedTask.groupId)?.name || "No group assigned."}</Text>
                   </View>
                 </View>
 
                 <View style={styles.modalRow}>
-                  <Text style={styles.modalLabel}>Status:</Text>
+                  <Text style={[styles.modalLabel, { color: theme.grayText }]}>Status:</Text>
                   <Text style={[styles.modalValue, {color: selectedTask.completed ? "#43a047" : "#f57c00"}]}>{selectedTask.completed ? "Completed" : "Remaining"}</Text>
                 </View>
               </>)}
@@ -577,12 +603,12 @@ export default function TaskScreen() {
         <Modal transparent={true} animationType="fade">
           <TouchableOpacity activeOpacity={1} style={styles.overlay} onPress={() => setFilterModalVisible(false)} />
             
-          <View style={[styles.filterDropdown, {position: "absolute", top:filterButtonLayout.y + filterButtonLayout.height + 5, left: filterButtonLayout.x}]}>
+          <View style={[styles.filterDropdown, {position: "absolute", top:filterButtonLayout.y + filterButtonLayout.height + 5, left: filterButtonLayout.x, backgroundColor: theme.surface}]}>
             <ScrollView nestedScrollEnabled={true}>
               {myGroups.map((group) => {
                 const isSelected = selectedGroupFilter.includes(group.id);
                 return (
-                  <TouchableOpacity key={group.id} style={{flexDirection: "row", alignItems: "center", paddingVertical: 12, paddingHorizontal: 10, borderBottomWidth: 1, borderBlockColor: "#eee"}} onPress={() => {
+                  <TouchableOpacity key={group.id} style={{flexDirection: "row", alignItems: "center", paddingVertical: 12, paddingHorizontal: 10, borderBottomWidth: 1, borderBottomColor: theme.surfaceBorder}} onPress={() => {
                       if (isSelected) {
                         setSelectedGroupFilter(selectedGroupFilter.filter((id) => id !== group.id));
                       } else {
@@ -592,7 +618,7 @@ export default function TaskScreen() {
                     <View style={[styles.filterCheckbox, {borderColor: group.colour, backgroundColor: isSelected ? group.colour : "white"}]}>
                       {isSelected && <AntDesign name="check" size={14} color="white" />}
                     </View>
-                    <Text style={[styles.pillText]}>{group.name}</Text>
+                    <Text style={[styles.pillText, { color: theme.defaultText }]}>{group.name}</Text>
                   </TouchableOpacity>
                 );
               })}
@@ -605,12 +631,12 @@ export default function TaskScreen() {
         <Modal transparent={true} animationType="fade">
           <TouchableOpacity activeOpacity={1} style={styles.overlay} onPress={() => setCompletedFilterModalVisible(false)} />
             
-          <View style={[styles.filterDropdown, {position: "absolute", top:completedFilterButtonLayout.y + completedFilterButtonLayout.height + 5, left: completedFilterButtonLayout.x}]}>
+          <View style={[styles.filterDropdown, {position: "absolute", top:completedFilterButtonLayout.y + completedFilterButtonLayout.height + 5, left: completedFilterButtonLayout.x, backgroundColor: theme.surface}]}>
             <ScrollView nestedScrollEnabled={true}>
               {myGroups.map((group) => {
                 const isSelected = selectedCompletedGroupFilter.includes(group.id);
                 return (
-                  <TouchableOpacity key={group.id} style={{flexDirection: "row", alignItems: "center", paddingVertical: 12, paddingHorizontal: 10, borderBottomWidth: 1, borderBlockColor: "#eee"}} onPress={() => {
+                  <TouchableOpacity key={group.id} style={{flexDirection: "row", alignItems: "center", paddingVertical: 12, paddingHorizontal: 10, borderBottomWidth: 1, borderBottomColor: theme.surfaceBorder}} onPress={() => {
                       if (isSelected) {
                         setSelectedCompletedGroupFilter(selectedCompletedGroupFilter.filter((id) => id !== group.id));
                       } else {
@@ -620,7 +646,7 @@ export default function TaskScreen() {
                     <View style={[styles.filterCheckbox, {borderColor: group.colour, backgroundColor: isSelected ? group.colour : "white"}]}>
                       {isSelected && <AntDesign name="check" size={14} color="white" />}
                     </View>
-                    <Text style={[styles.pillText]}>{group.name}</Text>
+                    <Text style={[styles.pillText, { color: theme.defaultText }]}>{group.name}</Text>
                   </TouchableOpacity>
                 );
               })}
@@ -629,7 +655,7 @@ export default function TaskScreen() {
         </Modal>
       )}
 
-      </View>
+    </View>
   );
 }
 
@@ -639,7 +665,6 @@ const styles = StyleSheet.create({
   // =========================
   entire: {
     flex: 1,
-    backgroundColor: Colours.background,
   },
 
   // =========================
@@ -650,7 +675,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 20,
     paddingVertical: 18,
-    backgroundColor: Colours.surface,
     elevation: 4,
     borderBottomColor: "#ffffff10",
     borderBottomWidth: 1,
@@ -663,7 +687,6 @@ const styles = StyleSheet.create({
   },
 
   topHeaderText: {
-    color: Colours.defaultText,
     fontWeight: "700",
     fontSize: 26,
     marginLeft: 10,
@@ -672,14 +695,13 @@ const styles = StyleSheet.create({
   // =========================
   // TASK SECTION
   // =========================
-  header: {
+    header: {
     width: "100%",
     flexDirection: "row",
     justifyContent: "space-around",
     alignItems: "center",
     paddingVertical: 14,
     marginBottom: 6,
-    backgroundColor: Colours.background,
   },
 
   taskCounter: {
@@ -701,13 +723,11 @@ const styles = StyleSheet.create({
 
   taskCounterText: {
     fontSize: 13,
-    color: Colours.textSecondary,
     marginBottom: 2,
   },
 
   taskCount: {
     fontSize: 28,
-    color: Colours.defaultText,
     fontWeight: "700",
   },
 
@@ -719,9 +739,7 @@ const styles = StyleSheet.create({
   },
 
   taskCard: {
-    backgroundColor: Colours.surface,
     borderRadius: 14,
-    borderColor: Colours.surfaceBorder,
     borderWidth: 1,
     padding: 15,
     marginBottom: 12,
@@ -744,7 +762,6 @@ const styles = StyleSheet.create({
     width: 4,
     borderRadius: 2,
     marginRight: 12,
-    backgroundColor: Colours.primary,
     alignSelf: "stretch",
   },
 
@@ -755,25 +772,21 @@ const styles = StyleSheet.create({
   taskCardName: {
     fontSize: 18,
     fontWeight: "700",
-    color: Colours.defaultText,
     marginBottom: 2,
   },
 
   taskCardDescription: {
     fontSize: 13.5,
-    color: Colours.textSecondary,
   },
 
   taskDifficultyContainer: {
     position: "absolute",
     top: -5,
     right: 12,
-    backgroundColor: Colours.background,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: Colours.surfaceBorder,
   },
 
   dueDate: {
@@ -801,8 +814,6 @@ const styles = StyleSheet.create({
   },
 
   tasksSearchContainer: {
-    backgroundColor: Colours.surface,
-    borderColor: Colours.surfaceBorder,
     borderWidth: 1,
     borderRadius: 10,
     width: 160,
@@ -815,7 +826,6 @@ const styles = StyleSheet.create({
 
   tasksLabel: {
     fontSize: 19,
-    color: Colours.defaultText,
     fontWeight: "600",
   },
 
@@ -859,7 +869,6 @@ const styles = StyleSheet.create({
     width: 75,
     height: 75,
     borderRadius: 37.5,
-    backgroundColor: Colours.primary,
   },
 
   popup: {
@@ -873,7 +882,6 @@ const styles = StyleSheet.create({
   popupBox: {
     width: "100%",
     maxWidth: 340,
-    backgroundColor: Colours.surface,
     borderRadius: 20,
     padding: 25,
     elevation: 8,
@@ -903,13 +911,11 @@ const styles = StyleSheet.create({
   popupText: {
     fontWeight: "800",
     fontSize: 22,
-    color: Colours.defaultText,
     textAlign: "center",
     marginBottom: 20,
   },
 
   popupInfo: {
-    color: Colours.grayText,
     fontWeight: "600",
     marginBottom: 5,
     marginTop: 10,
@@ -918,13 +924,10 @@ const styles = StyleSheet.create({
   textInp: {
     width: "100%",
     height: 50,
-    backgroundColor: Colours.surface,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#e0e0e0",
     paddingHorizontal: 15,
     fontSize: 16,
-    color: Colours.defaultText,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
@@ -945,10 +948,8 @@ const styles = StyleSheet.create({
   },
 
   inpType: {
-    backgroundColor: Colours.surface,
     height: 50,
     borderWidth: 1,
-    borderColor: "#e0e0e0",
     borderRadius: 10,
     justifyContent: "center",
     paddingHorizontal: 15,
@@ -992,22 +993,11 @@ const styles = StyleSheet.create({
     marginHorizontal: 5,
     borderRadius: 10,
     borderWidth: 1.5,
-    borderColor: Colours.secondary,
     alignItems: "center",
-    backgroundColor: "#f8f8f8",
-  },
-
-  activeButton: {
-    backgroundColor: "#0F6EC6",
   },
 
   pillText: {
     fontWeight: "600",
-    color: Colours.defaultText,
-  },
-
-  activeText: {
-    color: "white",
   },
 
   iconOption: {
@@ -1015,8 +1005,6 @@ const styles = StyleSheet.create({
     height: 55,
     borderRadius: 15,
     borderWidth: 1,
-    borderColor: "#ddd",
-    backgroundColor: Colours.surface,
     justifyContent: "center",
     alignItems: "center",
     marginRight: 10,
@@ -1049,7 +1037,6 @@ const styles = StyleSheet.create({
   taskDetailsModal: {
     width: "100%",
     maxWidth: 360,
-    backgroundColor: Colours.surface,
     borderRadius: 20,
     padding: 25,
     elevation: 10,
@@ -1062,7 +1049,6 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 22,
     fontWeight: "800",
-    color: Colours.primary,
     textAlign: "center",
     marginBottom: 20,
   },
@@ -1074,13 +1060,11 @@ const styles = StyleSheet.create({
   modalLabel: {
     fontSize: 14,
     fontWeight: "700",
-    color: Colours.grayText,
     marginBottom: 4,
   },
 
   modalValue: {
     fontSize: 16,
-    color: Colours.defaultText,
   },
 
   // =========================
@@ -1097,7 +1081,6 @@ const styles = StyleSheet.create({
 
   filterDropdown: {
     width: 220,
-    backgroundColor: "white",
     borderRadius: 10,
     maxHeight: 300,
     elevation: 5,
@@ -1113,7 +1096,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 10,
     borderBottomWidth: 1,
-    borderBottomColor: "#eee",
   },
 
   filterCheckbox: {
@@ -1127,4 +1109,3 @@ const styles = StyleSheet.create({
   },
 
 });
-

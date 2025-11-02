@@ -11,36 +11,39 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (authUser) => {
+    let unsubscribeSnapshot;
+
+    const unsubscribeAuth = onAuthStateChanged(auth, (authUser) => {
       setUser(authUser);
-      
-      if (authUser) {
-        const unsubscribeSnapshot = onSnapshot(
-          doc(db, 'users', authUser.uid),
-          (docSnap) => {
-            if (docSnap.exists()) {
-              setUserData(docSnap.data());
-            } else {
-              console.log('No user document found for:', authUser.uid);
-              setUserData(null);
-            }
-            setLoading(false);
-          },
-          (error) => {
-            console.error('Error fetching user data:', error);
-            setUserData(null);
-            setLoading(false);
-          }
-        );
-        
-        return unsubscribeSnapshot;
-      } else {
+
+      if (!authUser) {
         setUserData(null);
         setLoading(false);
+        if (unsubscribeSnapshot) unsubscribeSnapshot();
+        return;
       }
+
+      if (unsubscribeSnapshot) unsubscribeSnapshot();
+
+      unsubscribeSnapshot = onSnapshot(
+        doc(db, 'users', authUser.uid),
+        (docSnap) => {
+          if (docSnap.exists()) setUserData(docSnap.data());
+          else setUserData(null);
+          setLoading(false);
+        },
+        (error) => {
+          console.error('Error fetching user data:', error);
+          setUserData(null);
+          setLoading(false);
+        }
+      );
     });
 
-    return unsubscribe;
+    return () => {
+      unsubscribeAuth();
+      if (unsubscribeSnapshot) unsubscribeSnapshot();
+    };
   }, []);
 
   return (

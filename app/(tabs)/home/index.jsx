@@ -3,7 +3,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { View, StyleSheet, Dimensions, Text, TouchableOpacity, Modal, TextInput, Alert, Platform } from "react-native";
 import { ScrollView, Switch } from "react-native-gesture-handler";
 import Svg, { Path, G, Circle} from "react-native-svg";
-import { Color as Colours } from "../../../constants/colors";
+import { useTheme } from '../../../context/ThemeContext';
 import { AntDesign, FontAwesome, Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import DateTimePicker from "@react-native-community/datetimepicker";
@@ -20,6 +20,7 @@ import { createGroup as createGroupDB, createTask as createTaskDB, leaveGroup as
 
 export default function Home() {
   const {user, userData, loading: authLoading} = useAuth();
+  const {theme, isDarkMode} = useTheme(); // Changed from Colours to theme
   const router = useRouter();
   const { tasks, setTasks, allGroups, setAllGroups, myGroups, setMyGroups, loading: dataLoading, loadingProgress } = useData();
 
@@ -38,7 +39,7 @@ export default function Home() {
   const [groupName, setGroupName] = useState("");
   const [selectedIcon, setSelectedIcon] = useState("people-sharp");
   const [groupType, setGroupType] = useState("Public");
-  const [selectedColour, setSelectedColour] = useState(Colours.groupColours[0]);
+  const [selectedColour, setSelectedColour] = useState(theme.groupColours[0]); // Use theme here
 
   const [showStatsModal, setShowStatsModal] = useState(false);
 
@@ -55,8 +56,8 @@ export default function Home() {
 
   if (!user || !userData) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
-        <Text style={{ marginTop: 10, color: "#666" }}>Please log in</Text>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.background }}>
+        <Text style={{ marginTop: 10, color: theme.grayText }}>Please log in</Text>
       </View>
     );
   }
@@ -65,7 +66,7 @@ export default function Home() {
   const totalMembers = myGroups.reduce((sum, group) => group.creatorId === userId ? sum + group.membersList.length : sum, 0);
   const progressPercentage = tasks.length > 0 ? tasks.filter((task) => task.completed).length / tasks.length  * 100 : 0;
 
-  const tasksCompleted = tasks.filter((task) => task.completedBy && task.completedBy.includes(user.uid)).length
+  const tasksCompleted = tasks.filter((task) => Array.isArray(task.completedBy) && task.completedBy.includes(user.uid)).length;
   const groupsJoined = myGroups.length;
   const totalTasks = tasks.length;
   const groupsWithProgress = myGroups.map(group => {
@@ -126,41 +127,32 @@ export default function Home() {
   }
   const {mostActiveGroup, leastActiveGroup} = calculateGroupActivity()
 
-  let handleLogout = async () => {
-    try {
-      await signOut(auth);
-      console.log("Logged out Successfully");
-    } catch (error) {
-      Alert.alert("Error", error.message)
-    }
-  }
 
-  let renderTask = (task, index, isLastInList) => {
+  const renderTask = (task, index, isLastInList) => {
     const difficultyStyleMap = {
       Easy: {
-        backgroundColor: Colours.success + "55",
+        backgroundColor: theme.success + "55",
       },
       Medium: {
-        backgroundColor: Colours.lightWarning + "55",
+        backgroundColor: theme.lightWarning + "55",
       },
       Hard: {
-        backgroundColor: Colours.warning + "55",
+        backgroundColor: theme.warning + "55",
       },
-
     };
 
     return (
       <View key={task.id} style={styles.taskCard}>
-        <View style={[ styles.taskCardGroupIndicator,{ backgroundColor: myGroups.find((group) => group.id === task.groupId)?.colour || Colours.primary},]}/>
+        <View style={[ styles.taskCardGroupIndicator,{ backgroundColor: myGroups.find((group) => group.id === task.groupId)?.colour || theme.primary},]}/>
         
         <View style={[styles.taskCardInner, isLastInList && { borderBottomWidth: 0}]}>
           <View style={styles.taskLeft}>
-            <Text style={styles.taskCardName}>{task.title}</Text>
-            <Text style={styles.taskCardDate}>Due {task.dueDate}</Text>
+            <Text style={[styles.taskCardName, { color: theme.defaultText }]}>{task.title}</Text>
+            <Text style={[styles.taskCardDate, { color: theme.grayText }]}>Due {task.dueDate}</Text>
           </View>
 
           <View style={[styles.taskDifficultyContainer, difficultyStyleMap[task.difficulty]]}>
-            <Text style={styles.taskDifficultyText}>{task.difficulty}</Text>
+            <Text style={[styles.taskDifficultyText, { color: theme.defaultText }]}>{task.difficulty}</Text>
           </View>
         </View>
         
@@ -172,14 +164,14 @@ export default function Home() {
     const isLast = index === myGroups.length - 1;
 
     return (
-      <TouchableOpacity key={group.id} style={styles.groupCard} onPress={() => {
+      <TouchableOpacity key={group.id} style={[styles.groupCard, { backgroundColor: theme.surface }]} onPress={() => {
         setShowRecentGroup(true); 
         setSelectedGroupId(group.id)}}>
 
         <View style={[styles.groupMain, {backgroundColor: group.colour}]}>
           <Ionicons name={group.icon} size={24} color={"#fff"}></Ionicons>
         </View>
-        <Text style={styles.groupText}>{group.name}</Text>
+        <Text style={[styles.groupText, { color: theme.defaultText }]}>{group.name}</Text>
 
       </TouchableOpacity>
     )
@@ -284,7 +276,7 @@ export default function Home() {
     setGroupName("");
     setSelectedIcon("people-sharp");
     setGroupType("Public");
-    setSelectedColour(Colours.groupColours[0]);
+    setSelectedColour(theme.groupColours[0]);
   }
 
   const leaveGroup = async (selectedGroupId) => {
@@ -345,21 +337,24 @@ export default function Home() {
   }).slice(0, 2)
   
   return (
-    <View style={styles.entire}>
+    <View style={[styles.entire, { backgroundColor: theme.background }]}>
       <ScrollView style={{ width: "100%", height: "100%" }}>
         <View style={styles.container}>
           <Svg height={140} width="100%" viewBox="0 0 1440 320" preserveAspectRatio="xMidYMin slice" style={styles.svg}>
-            <Path fill={Colours.primary} d="M0 0 H1440 C1300 50, 1100 300, 900 260 C700 200, 500 400, 300 260 C150 100, 75 100, 0 260 Z" />
+            <Path fill={theme.primary} d="M0 0 H1440 C1300 50, 1100 300, 900 260 C700 200, 500 400, 300 260 C150 100, 75 100, 0 260 Z" />
           </Svg>
 
           <View style={styles.headerContent}>
-              <View style={styles.headerText}>
-                <Text style={styles.greeting} numberOfLines={1} ellipsizeMode="tail">Welcome back, {userData?.name || 'User'}</Text>
-                <Text style={styles.overview}>Here's your overview</Text>
-              </View>
-              <TouchableOpacity onPress={() => handleLogout()}>
-                <AntDesign name="logout" size={28} color={Colours.primaryText} style={styles.logout}></AntDesign>
-              </TouchableOpacity>
+            <View style={{ flex: 1, marginRight: 10 }}>
+              <Text
+                style={[styles.greeting, { color: theme.primaryText }]}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                Welcome back, {userData?.name || "User"}
+              </Text>
+              <Text style={styles.overview}>Here's your overview</Text>
+            </View>
           </View>
         </View>
 
@@ -367,84 +362,84 @@ export default function Home() {
 
           <View style={styles.topUser}>
 
-            <View style={styles.todayTask}>
+            <View style={[styles.todayTask, { backgroundColor: theme.surface }]}>
 
               <View style={styles.headerRow}>
-                <View style={styles.accentBar} />
-                <Text style={styles.todayTaskText}>Today's Tasks</Text>
+                <View style={[styles.accentBar, { backgroundColor: theme.primary }]} />
+                <Text style={[styles.todayTaskText, { color: theme.defaultText }]}>Today's Tasks</Text>
               </View>
 
               <View style={styles.taskTextContainer}>
-                <Text style={styles.numTask}>{tasks.filter((task) => !task.completed).length}</Text>
-                <Text style={styles.taskType}>Remaining</Text>
+                <Text style={[styles.numTask, { color: theme.defaultText }]}>{tasks.filter((task) => !task.completed).length}</Text>
+                <Text style={[styles.taskType, { color: theme.grayText }]}>Remaining</Text>
               </View>
 
               <View style={styles.taskTextContainer}>
-                <Text style={styles.numTask}>{tasks.filter((task) => task.completed).length}</Text>
-                <Text style={styles.taskType}>Completed</Text>
+                <Text style={[styles.numTask, { color: theme.defaultText }]}>{tasks.filter((task) => task.completed).length}</Text>
+                <Text style={[styles.taskType, { color: theme.grayText }]}>Completed</Text>
               </View>
 
             </View>
 
-            <View style={styles.userGroups}>
+            <View style={[styles.userGroups, { backgroundColor: theme.surface }]}>
 
               <View style={styles.headerRow}>
                 <View style={styles.accentBarGroups} />
-                <Text style={styles.todayTaskText}>
+                <Text style={[styles.todayTaskText, { color: theme.defaultText }]}>
                   <FontAwesome name="group" size={18} color="#0F6EC6" /> Owned Groups
                 </Text>
               </View>
 
               <View style={styles.taskTextContainer}>
-                <Text style={styles.numTask}>{myGroups.filter((group) => group.creatorId === userId).length}</Text>
-                <Text style={styles.taskType}>Active</Text>
+                <Text style={[styles.numTask, { color: theme.defaultText }]}>{myGroups.filter((group) => group.creatorId === userId).length}</Text>
+                <Text style={[styles.taskType, { color: theme.grayText }]}>Active</Text>
               </View>
 
               <View style={styles.taskTextContainer}>
-                <Text style={styles.numTask}>{totalMembers}</Text>
-                <Text style={styles.taskType}>Members total</Text>
+                <Text style={[styles.numTask, { color: theme.defaultText }]}>{totalMembers}</Text>
+                <Text style={[styles.taskType, { color: theme.grayText }]}>Members total</Text>
               </View>
 
             </View>
 
           </View>
 
-          <View style={styles.userProgress}>
+          <View style={[styles.userProgress, { backgroundColor: theme.surface }]}>
             <View style={styles.userProgressText}>
-              <Text style={styles.progressTitle}>Your Progress This Week</Text>
+              <Text style={[styles.progressTitle, { color: theme.defaultText }]}>Your Progress This Week</Text>
               <Ionicons name="calendar-outline" size={24} color="#0F6EC6" />
             </View>
 
             <View style={styles.userProgressBar}>
-                <View style={styles.userBackgroundBar}></View>
+                <View style={[styles.userBackgroundBar, { backgroundColor: theme.surfaceBorder }]}></View>
                 <View style={[styles.userOvergroundBar, { width: `${progressPercentage}%`,}]}></View>
             </View>
 
             <View style={styles.userPercentage}>
-              <Text style={styles.userPercentageNum}>{Math.round(progressPercentage)}%</Text>
-              <Text style={styles.userPercentageText}>Tasks Completed</Text>
+              <Text style={[styles.userPercentageNum, { color: theme.defaultText }]}>{Math.round(progressPercentage)}%</Text>
+              <Text style={[styles.userPercentageText, { color: theme.grayText }]}>Tasks Completed</Text>
             </View>
 
           </View>
 
           <View style={styles.quickActions}>
-            <Text style={styles.quickText}>Quick Actions</Text>
+            <Text style={[styles.quickText, { color: theme.defaultText }]}>Quick Actions</Text>
 
           <View style={styles.actionGroup}>
 
-            <TouchableOpacity style={styles.actionCard} onPress={() => setShowAddTaskModal(true)}>
+            <TouchableOpacity style={[styles.actionCard, { backgroundColor: theme.surface }]} onPress={() => setShowAddTaskModal(true)}>
               <Ionicons name="add-circle" size={50} color="#0F6EC6" />
-              <Text style={styles.AddText}>Add Task</Text>
+              <Text style={[styles.AddText, { color: theme.defaultText }]}>Add Task</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.actionCard} onPress={() => setShowAddGroupModal(true)}>
+            <TouchableOpacity style={[styles.actionCard, { backgroundColor: theme.surface }]} onPress={() => setShowAddGroupModal(true)}>
               <Ionicons name="people-circle" size={50} color="#0F6EC6" />
-              <Text style={styles.AddText}>Create Group</Text>
+              <Text style={[styles.AddText, { color: theme.defaultText }]}>Create Group</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.actionCard} onPress={() => setShowStatsModal(true)}>
+            <TouchableOpacity style={[styles.actionCard, { backgroundColor: theme.surface }]} onPress={() => setShowStatsModal(true)}>
               <FontAwesome name="user-circle" size={50} color="#0F6EC6" />
-              <Text style={styles.AddText}>View Stats</Text>
+              <Text style={[styles.AddText, { color: theme.defaultText }]}>View Stats</Text>
             </TouchableOpacity>
 
           </View>
@@ -452,9 +447,9 @@ export default function Home() {
           </View>
 
           <View style={styles.upcomingTasks}>
-            <Text style={styles.upcomingText}>Upcoming Tasks</Text>
+            <Text style={[styles.upcomingText, { color: theme.defaultText }]}>Upcoming Tasks</Text>
 
-            <View style={styles.taskContainer}>
+            <View style={[styles.taskContainer, { backgroundColor: theme.surface }]}>
               {upcomingTasks.length > 0 ? (
                 <>
                   {upcomingTasks.map((task, index, array) => renderTask(task, index, index === array.length-1))}
@@ -463,7 +458,7 @@ export default function Home() {
                   </TouchableOpacity>
                 </>
               ) : (
-                <Text style={{ width: "100%", textAlign: "center", color: Colours.grayText, marginVertical: 20 }}>
+                <Text style={{ width: "100%", textAlign: "center", color: theme.grayText, marginVertical: 20 }}>
                   Create a task to get started
                 </Text>
               )}
@@ -471,7 +466,7 @@ export default function Home() {
           </View>
 
           <View style={styles.activeGroups}>
-            <Text style={styles.quickText}>Active Groups</Text>
+            <Text style={[styles.quickText, { color: theme.defaultText }]}>Active Groups</Text>
 
             <View style={styles.mainGroups}>
               {myGroups.slice(0, 2).map((group, index) => (renderGroup(group, index)))}
@@ -484,46 +479,46 @@ export default function Home() {
 
       <Modal visible={showAddTaskModal} animationType="fade" transparent={true} onRequestClose={() => setShowAddTaskModal(false)}>
         <View style={styles.popup}>
-          <View style={styles.popupBox}>
+          <View style={[styles.popupBox, { backgroundColor: theme.surface }]}>
             <TouchableOpacity style={styles.close} onPress={() => setShowAddTaskModal(false)}>
               <AntDesign name="close-circle" size={30} color="white"></AntDesign>
             </TouchableOpacity>
 
-            <Text style={styles.popupText}>Create Task</Text>
+            <Text style={[styles.popupText, { color: theme.defaultText }]}>Create Task</Text>
 
-            <Text style={styles.popupInfo}>Task*</Text>
-            <TextInput style={styles.textInp} placeholder="Complete Project..." placeholderTextColor={Colours.textSecondary} value={taskName} onChangeText={setTaskName}/>
+            <Text style={[styles.popupInfo, { color: theme.defaultText }]}>Task*</Text>
+            <TextInput style={[styles.textInp, { backgroundColor: theme.surface, borderColor: theme.surfaceBorder, color: theme.defaultText }]} placeholder="Complete Project..." placeholderTextColor={theme.grayText} value={taskName} onChangeText={setTaskName}/>
 
             <View style={{ flexDirection: "row", alignItems: "center", marginVertical: 10 }}>
-              <Switch value={hasDueDate} onValueChange={setHasDueDate} thumbColor={hasDueDate ? Colours.primary : "#ccc"} trackColor={{ false: "#aaa", true: Colours.primary }}/>
-              <Text style={{ marginLeft: 10, color: Colours.defaultText, fontWeight: "600" }}>Add a due date?</Text>
+              <Switch value={hasDueDate} onValueChange={setHasDueDate} thumbColor={hasDueDate ? theme.primary : "#ccc"} trackColor={{ false: "#aaa", true: theme.primary }}/>
+              <Text style={{ marginLeft: 10, color: theme.defaultText, fontWeight: "600" }}>Add a due date?</Text>
             </View>
 
             {hasDueDate && (
               <View style={styles.DateTimePickers}>
                 <View style={styles.popupPicker}>
-                  <Text style={styles.popupInfo}>Date*</Text>
-                  <TouchableOpacity style={styles.inpType} onPress={() => setShowDatePicker(true)}>
-                    <Text>{taskDate.toDateString()}</Text>
+                  <Text style={[styles.popupInfo, { color: theme.defaultText }]}>Date*</Text>
+                  <TouchableOpacity style={[styles.inpType, { backgroundColor: theme.surface, borderColor: theme.surfaceBorder }]} onPress={() => setShowDatePicker(true)}>
+                    <Text style={{color: theme.grayText}}>{taskDate.toDateString()}</Text>
                   </TouchableOpacity>
                 </View>
               </View>
             )}
 
-            <Text style={styles.popupInfo}>Difficulty</Text>
+            <Text style={[styles.popupInfo, { color: theme.defaultText }]}>Difficulty</Text>
             <View style={styles.pill}>
               {['Easy', 'Medium', 'Hard'].map((level) => (
-                <TouchableOpacity key={level} style={[styles.pillButton, difficulty === level && styles.activeButton]} onPress={() => setDifficulty(level)}>
-                  <Text style={[styles.pillText, difficulty === level && styles.activeText]}>{level}</Text>
+                <TouchableOpacity key={level} style={[styles.pillButton, { backgroundColor: difficulty === level ? theme.primary : theme.surfaceBorder, borderColor: difficulty === level ? theme.primary : theme.secondary }]} onPress={() => setDifficulty(level)}>
+                  <Text style={[styles.pillText, { color: difficulty === level ? "white" : theme.secondaryText }]}>{level}</Text>
                 </TouchableOpacity>
               ))}
             </View>
 
-            <Text style={styles.popupInfo}>Group*</Text>
+            <Text style={[styles.popupInfo, { color: theme.defaultText }]}>Group*</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginVertical: 10}}>
               {myGroups.map((group) => (
                 <View key={group.id} style={{ alignItems: 'center', marginRight: 15 }}>
-                  <TouchableOpacity style={[styles.iconOption, selectedGroupT?.id === group.id && styles.iconSelected, {backgroundColor: group.colour}]} onPress={() => setSelectedGroupT(group)}>
+                  <TouchableOpacity style={[styles.iconOption, selectedGroupT?.id === group.id && styles.iconSelected, {backgroundColor: group.colour, borderColor: selectedGroupT?.id === group.id ? "#0F6EC6" : theme.surfaceBorder}]} onPress={() => setSelectedGroupT(group)}>
                     <Ionicons name={group.icon} size={26} color="white"></Ionicons>
                   </TouchableOpacity>
                   
@@ -532,12 +527,12 @@ export default function Home() {
               ))}
             </ScrollView>
 
-            <Text style={styles.popupInfo}>Description</Text>
-            <TextInput style={[styles.textInp, { height: 80, textAlignVertical: "top" }]} placeholder="Add more details..." placeholderTextColor={Colours.textSecondary} value={taskDescription} onChangeText={setTaskDescription}multiline/>
+            <Text style={[styles.popupInfo, { color: theme.defaultText }]}>Description</Text>
+            <TextInput style={[styles.textInp, { height: 80, textAlignVertical: "top", backgroundColor: theme.surface, borderColor: theme.surfaceBorder, color: theme.defaultText }]} placeholder="Add more details..." placeholderTextColor={theme.grayText} value={taskDescription} onChangeText={setTaskDescription}multiline/>
 
             <TouchableOpacity style={styles.addButton} onPress={() => addTask(taskName, hasDueDate ? taskDate : null)}>
               <Text style={styles.addText}>Add Task</Text>
-              <AntDesign name="enter" color={Colours.primaryText} size={24} />
+              <AntDesign name="enter" color={theme.primaryText} size={24} />
             </TouchableOpacity>
 
             {showDatePicker && ( <DateTimePicker value={taskDate} mode="date" display={Platform.OS === "ios" ? "spinner" : "default"} minimumDate={new Date()} onChange={(event, selectedDate) => {setShowDatePicker(false); if (selectedDate) setTaskDate(selectedDate);}}/>)}
@@ -548,40 +543,40 @@ export default function Home() {
       <Modal transparent={true} animationType="fade" visible={showAddGroupModal} onRequestClose={() => setShowAddGroupModal(false)}>
         <View style={styles.popup}>
 
-          <View style={styles.popupBox}>
+          <View style={[styles.popupBox, { backgroundColor: theme.surface }]}>
 
             <TouchableOpacity style={styles.close} onPress={() => setShowAddGroupModal(false)}>
               <AntDesign name="close-circle" size={28} color="white"></AntDesign>
             </TouchableOpacity>
 
-            <Text style={styles.popupText}>Create Group</Text>
+            <Text style={[styles.popupText, { color: theme.defaultText }]}>Create Group</Text>
 
-            <Text style={styles.popupInfo}>Group Name*</Text>
-            <TextInput style={styles.textInp} placeholder="Enter group name..." placeholderTextColor={Colours.secondaryText} value={groupName} onChangeText={setGroupName}/>
+            <Text style={[styles.popupInfo, { color: theme.defaultText }]}>Group Name*</Text>
+            <TextInput style={[styles.textInp, { backgroundColor: theme.surface, borderColor: theme.surfaceBorder, color: theme.defaultText }]} placeholder="Enter group name..." placeholderTextColor={theme.secondaryText} value={groupName} onChangeText={setGroupName}/>
 
-            <Text style={styles.popupInfo}>Group Icon</Text>
+            <Text style={[styles.popupInfo, { color: theme.defaultText }]}>Group Icon</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginVertical: 10}}>
               {["book", "people-sharp", "school", "home", "fitness", "briefcase", "game-controller", "musical-notes"].map((iconName, index) => (
-                <TouchableOpacity key={iconName} style={[styles.iconOption, selectedIcon === iconName && styles.iconSelected]} onPress={() => setSelectedIcon(iconName)}>
-                  <Ionicons name={iconName} size={28} color={selectedIcon === iconName ? "white" : Colours.defaultText} />
+                <TouchableOpacity key={iconName} style={[styles.iconOption, selectedIcon === iconName && styles.iconSelected, { backgroundColor: selectedIcon === iconName ? "#0F6EC6" : theme.surface, borderColor: theme.surfaceBorder }]} onPress={() => setSelectedIcon(iconName)}>
+                  <Ionicons name={iconName} size={28} color={selectedIcon === iconName ? "white" : theme.defaultText} />
                 </TouchableOpacity>
               ))}
             </ScrollView>
 
-            <Text style={styles.popupInfo}>Group Type</Text>
+            <Text style={[styles.popupInfo, { color: theme.defaultText }]}>Group Type</Text>
             <View style={styles.pill}>
-              <TouchableOpacity style={[ styles.leftButton, groupType === "Public" && styles.activeButton, ]} onPress={() => setGroupType("Public")}>
-                <Text style={[ styles.pillText, groupType === "Public" && styles.activeText, ]}>Public</Text>
+              <TouchableOpacity style={[ styles.leftButton, groupType === "Public" && styles.activeButton, { backgroundColor: groupType === "Public" ? theme.primary : "#e0e0e0" } ]} onPress={() => setGroupType("Public")}>
+                <Text style={[ styles.pillText, { color: groupType === "Public" ? "white" : theme.defaultText } ]}>Public</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={[ styles.rightButton, groupType === "Private" && styles.activeButton, ]} onPress={() => setGroupType("Private")}>
-                <Text style={[ styles.pillText, groupType === "Private" && styles.activeText, ]}>Private</Text>
+              <TouchableOpacity style={[ styles.rightButton, groupType === "Private" && styles.activeButton, { backgroundColor: groupType === "Private" ? theme.primary : "#e0e0e0" } ]} onPress={() => setGroupType("Private")}>
+                <Text style={[ styles.pillText, { color: groupType === "Private" ? "white" : theme.defaultText } ]}>Private</Text>
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.popupInfo}>Group Colour</Text>
+            <Text style={[styles.popupInfo, { color: theme.defaultText }]}>Group Colour</Text>
             <View style={styles.colorRow}>
-              {Colours.groupColours.map((colour, index) => (
+              {theme.groupColours.map((colour, index) => (
                 <TouchableOpacity key={index} style={[styles.colorCircle, { backgroundColor: colour }, selectedColour === colour && styles.selectedColorBorder]} onPress={() => setSelectedColour(colour)} />
               ))}
             </View>
@@ -598,14 +593,14 @@ export default function Home() {
 
       <Modal transparent={true} animationType="fade" visible={showStatsModal} onRequestClose={() => setShowStatsModal(false)}>
         <View style={styles.overlay}>
-        <View style={styles.modalBox}>
-          <TouchableOpacity style={styles.close} onPress={() => setShowStatsModal(false)}>
-            <AntDesign name="close-circle" size={28} color="white" />
-          </TouchableOpacity>
+          <View style={[styles.modalBox, { backgroundColor: theme.surface }]}>
+            <TouchableOpacity style={styles.close} onPress={() => setShowStatsModal(false)}>
+              <AntDesign name="close-circle" size={28} color="white" />
+            </TouchableOpacity>
 
-          <Text style={styles.modalTitle}>Your Stats</Text>
+            <Text style={[styles.modalTitle, { color: theme.defaultText }]}>Your Stats</Text>
 
-          <ScrollView contentContainerStyle={{ paddingBottom: 20 }}>
+            <ScrollView contentContainerStyle={{ paddingBottom: 20 }}>
             
             <View style={styles.circularContainer}>
               <View style={styles.circleWrapper}>
@@ -615,44 +610,44 @@ export default function Home() {
                     <Circle cx="50" cy="50" r="45" stroke="#0F6EC6" strokeWidth="10" strokeDasharray={`${(tasksCompleted / totalTasks) * 283} 283`} strokeLinecap="round" fill="none"/>
                   </G>
                 </Svg>
-                <Text style={styles.circleText}>{Math.round((tasksCompleted / totalTasks) * 100)}%</Text>
+                <Text style={[styles.circleText, { color: theme.defaultText }]}>{Math.round((tasksCompleted / totalTasks) * 100)}%</Text>
               </View>
             </View>
 
             <View style={styles.cardRow}>
-              <View style={[styles.statsCard, { backgroundColor: "#E3F2FD" }]}>
+              <View style={[styles.statsCard, { backgroundColor: theme.StatsCard1}]}>
                 <Ionicons name="checkmark-done-circle" size={24} color="#0F6EC6" />
-                <Text style={styles.cardTitle}>Completed</Text>
-                <Text style={styles.cardValue}>{tasksCompleted}</Text>
+                <Text style={[styles.cardTitle, { color: theme.defaultText }]}>Completed</Text>
+                <Text style={[styles.cardValue, { color: theme.defaultText }]}>{tasksCompleted}</Text>
               </View>
-              <View style={[styles.statsCard, { backgroundColor: "#FFF3E0" }]}>
+              <View style={[styles.statsCard, { backgroundColor: theme.StatsCard2 }]}>
                 <Ionicons name="people-circle" size={24} color="#FFA726" />
-                <Text style={styles.cardTitle}>Groups Joined</Text>
-                <Text style={styles.cardValue}>{groupsJoined}</Text>
+                <Text style={[styles.cardTitle, { color: theme.defaultText }]}>Groups Joined</Text>
+                <Text style={[styles.cardValue, { color: theme.defaultText }]}>{groupsJoined}</Text>
               </View>
             </View>
 
             <View style={styles.cardRow}>
-              <View style={[styles.statsCard, { backgroundColor: "#E8F5E9" }]}>
+              <View style={[styles.statsCard, { backgroundColor: theme.StatsCard3 }]}>
                 <Ionicons name="flame-outline" size={24} color="#43A047" />
-                <Text style={styles.cardTitle}>Most Active</Text>
-                <Text style={styles.cardValue}>{mostActiveGroup}</Text>
+                <Text style={[styles.cardTitle, { color: theme.defaultText }]}>Most Active</Text>
+                <Text style={[styles.cardValue, { color: theme.defaultText }]}>{mostActiveGroup}</Text>
               </View>
-              <View style={[styles.statsCard, { backgroundColor: "#FFEBEE" }]}>
+              <View style={[styles.statsCard, { backgroundColor: theme.StatsCard4 }]}>
                 <Ionicons name="analytics-outline" size={24} color="#E53935" />
-                <Text style={styles.cardTitle}>Least Active</Text>
-                <Text style={styles.cardValue} numberOfLines={1}>{leastActiveGroup}</Text>
+                <Text style={[styles.cardTitle, { color: theme.defaultText }]}>Least Active</Text>
+                <Text style={[styles.cardValue, { color: theme.defaultText }]} numberOfLines={1}>{leastActiveGroup}</Text>
               </View>
             </View>
 
             <View style={{ marginTop: 20 }}>
-              <Text style={styles.sectionTitle}>Tasks Completed Per Group</Text>
+              <Text style={[styles.sectionTitle, { color: theme.defaultText }]}>Tasks Completed Per Group</Text>
               {groupsWithProgress.map((group, idx) => (
                 <View key={idx} style={{ marginBottom: 15 }}>
-                  <Text style={{ fontWeight: "600", color: Colours.defaultText, marginBottom: 5 }}>
+                  <Text style={{ fontWeight: "600", color: theme.defaultText, marginBottom: 5 }}>
                     {group.name} - {group.percent}%
                   </Text>
-                  <View style={styles.progressBarBackground}>
+                  <View style={[styles.progressBarBackground, { backgroundColor: theme.surfaceBorder }]}>
                     <View style={[styles.progressBarForeground, { width: `${group.percent}%` }]} />
                   </View>
                 </View>
@@ -667,7 +662,7 @@ export default function Home() {
 
       <Modal transparent={true} animationType="fade" visible={showRecentGroup} onRequestClose={() => setShowRecentGroup(false)}>
           <View style={styles.overlay}>
-            <View style={styles.modalBox}>
+            <View style={[styles.modalBox, { backgroundColor: theme.surface }]}>
 
               <TouchableOpacity style={styles.close} onPress={() => setShowRecentGroup(false)}>
                 <AntDesign name="close-circle" size={28} color="white" />
@@ -679,22 +674,22 @@ export default function Home() {
                     <View style={[styles.groupIconWrapper, { backgroundColor: selectedGroup.colour }]}>
                       <Ionicons name={selectedGroup.icon} size={24} color="#fff" />
                     </View>
-                    <Text style={styles.groupName}>{selectedGroup.name}</Text>
-                    <Text style={styles.groupMembersText}>
+                    <Text style={[styles.groupName, { color: theme.defaultText }]}>{selectedGroup.name}</Text>
+                    <Text style={[styles.groupMembersText, { color: theme.grayText }]}>
                       {selectedGroup.membersList.length} Members
                     </Text>
                   </View>
 
                   <View style={styles.statsRow}>
-                    <View style={styles.statsCard}>
+                    <View style={[styles.statsCard, {backgroundColor: theme.StatsCard1}]}>
                       <Ionicons name="people-outline" size={24} color="#0F6EC6" />
-                      <Text style={styles.statsCardTitle}>Active Members</Text>
-                      <Text style={styles.statsCardValue}>{selectedGroup.membersList.length}</Text>
+                      <Text style={[styles.statsCardTitle, { color: theme.defaultText }]}>Active Members</Text>
+                      <Text style={[styles.statsCardValue, { color: theme.primary }]}>{selectedGroup.membersList.length}</Text>
                     </View>
-                    <View style={styles.statsCard}>
+                    <View style={[styles.statsCard, {backgroundColor: theme.StatsCard3}]}>
                       <Ionicons name="checkmark-done-circle-outline" size={24} color="#43A047" />
-                      <Text style={styles.statsCardTitle}>Tasks Done</Text>
-                      <Text style={styles.statsCardValue}>{selectedGroup.percent}%</Text>
+                      <Text style={[styles.statsCardTitle, { color: theme.defaultText }]}>Tasks Done</Text>
+                      <Text style={[styles.statsCardValue, { color: theme.primary }]}>{selectedGroup.percent}%</Text>
                     </View>
                   </View>
 
@@ -719,14 +714,14 @@ const styles = StyleSheet.create({
 
   entire: {
     flex: 1,
-    backgroundColor: Colours.background,
   },
 
   container: {
     width: "100%",
-    height: 130,
+    minHeight: 140,
     position: "relative",
     overflow: "visible",
+    paddingTop: 20,
   },
 
   headerContent: {
@@ -742,7 +737,6 @@ const styles = StyleSheet.create({
   greeting: {
     fontWeight: 900,
     fontSize: 30,
-    color: Colours.primaryText,
   },
 
   overview: {
@@ -755,8 +749,6 @@ const styles = StyleSheet.create({
     position: "absolute"
   },
 
-  // ENTIRE USER INFO SECTION + FIRST ROW
-
   userMain: {
     display: "flex",
     flexDirection:"column",
@@ -768,7 +760,6 @@ const styles = StyleSheet.create({
   },
 
   todayTask: {
-    backgroundColor: Colours.surface,
     paddingHorizontal: 15,
     flex: 1,
     borderRadius: 16,
@@ -785,7 +776,6 @@ const styles = StyleSheet.create({
   todayTaskText: {
     fontWeight: "800",
     fontSize: 16,
-    color: Colours.defaultText,
     letterSpacing: 0.2,
     flexShrink: 0,
     maxWidth: "100%",
@@ -800,19 +790,16 @@ const styles = StyleSheet.create({
   numTask: {
     fontWeight: 700,
     fontSize: 25,
-    color: Colours.defaultText,
     marginRight: 8,
   },
 
   taskType: {
     fontWeight: 400,
     fontSize: 16,
-    color: Colours.grayText
   },
 
   userGroups: {
     flex: 2.3,
-    backgroundColor: Colours.surface,
     marginLeft: 15,
     borderRadius: 16,
     elevation: 1.5,
@@ -836,7 +823,6 @@ const styles = StyleSheet.create({
     width: 5,
     height: 22,
     borderRadius: 5,
-    backgroundColor: Colours.primary,
     marginRight: 10,
   },
 
@@ -848,11 +834,8 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
 
-  // PROGRASS BAR SECTION (2ND ROW)
-
   userProgress: {
     marginTop: 15,
-    backgroundColor: Colours.surface,
     padding: 20,
     borderRadius: 16,
     elevation: 1.5,
@@ -874,7 +857,6 @@ const styles = StyleSheet.create({
   },
 
   userBackgroundBar: {
-    backgroundColor: Colours.surfaceBorder,
     height: "100%",
     width: "100%",
     borderRadius: 10,
@@ -891,7 +873,6 @@ const styles = StyleSheet.create({
   progressTitle: {
     fontWeight: "700",
     fontSize: 18,
-    color: Colours.defaultText,
   },
 
   userPercentage: {
@@ -907,10 +888,8 @@ const styles = StyleSheet.create({
   },
 
   userPercentageText: {
-    color: Colours.grayText,
+    // color applied inline
   },
-
-  // Quick Actions Section (3rd Row)
 
   quickActions: {
     marginTop: 15,
@@ -920,7 +899,6 @@ const styles = StyleSheet.create({
   quickText: {
     fontWeight: "700",
     fontSize: 18,
-    color: Colours.defaultText,
     marginBottom: 10,
   },
 
@@ -930,7 +908,6 @@ const styles = StyleSheet.create({
   },
 
   actionCard: {
-    backgroundColor: Colours.surface,
     borderRadius: 16,
     flexDirection: "column",
     alignItems: "center",
@@ -945,13 +922,10 @@ const styles = StyleSheet.create({
   AddText: {
     fontWeight: "600",
     fontSize: 15,
-    color: Colours.defaultText,
     textAlign: "center",
     marginTop: 5,
     flexShrink: 1,
   },
-
-  // Upcoming Tasks Section (4th Row)
 
   upcomingTasks: {
     marginTop: 15,
@@ -962,7 +936,6 @@ const styles = StyleSheet.create({
   upcomingText: {
     fontWeight: "700",
     fontSize: 18,
-    color: Colours.defaultText,
     marginBottom: 10,
   },
 
@@ -970,7 +943,6 @@ const styles = StyleSheet.create({
     width: 4,
     borderRadius: 2,
     marginRight: 12,
-    backgroundColor: Colours.primary,
     alignSelf: "stretch",
   },
 
@@ -979,7 +951,6 @@ const styles = StyleSheet.create({
     elevation: 0.75,
     overflow: "hidden",
     borderRadius: 16,
-    backgroundColor: Colours.surface,
   },
 
   viewAllTasks: {
@@ -991,28 +962,18 @@ const styles = StyleSheet.create({
   },
 
   taskCard: { 
-    backgroundColor: Colours.surface, 
     paddingHorizontal: 20,
     flexDirection: "row", 
     alignItems: "center", 
     justifyContent: "center",
     marginTop: 10,
   },
-  
+
   taskCardInner: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    borderBottomWidth: 0.75,
-    borderBottomColor: Colours.grayText + "33",
     paddingBottom: 10,
-  },
-
-  taskCardWithDivider: {
-    borderBottomWidth: 1,
-    borderColor: Colours.grayText + "33",
-    alignSelf: "center",
-    width: "75%",
   },
 
   taskLeft: {
@@ -1024,13 +985,7 @@ const styles = StyleSheet.create({
   taskCardName: {
     fontWeight: "700",
     fontSize: 16,
-    color: Colours.defaultText,
     marginBottom: 4,
-  },
-
-  taskCardDescriptiond: {
-    fontSize: 14,
-    color: Colours.grayText,
   },
 
   taskDifficultyContainer: {
@@ -1043,12 +998,9 @@ const styles = StyleSheet.create({
   },
 
   taskDifficultyText: {
-    color: Colours.defaultText,
     fontWeight: "600",
     fontSize: 14,
   },
-
-  // Active Groups Section (5th Row)
 
   activeGroups: {
     marginTop: 15,
@@ -1060,7 +1012,6 @@ const styles = StyleSheet.create({
   },
 
   groupCard: {
-    backgroundColor: Colours.surface,
     borderRadius: 16,
     flexDirection: "column",
     paddingVertical: 20,
@@ -1083,17 +1034,14 @@ const styles = StyleSheet.create({
   groupText: {
     fontWeight: "600",
     fontSize: 16,
-    color: Colours.defaultText,
   },
 
-  // POPUP STYLES
   addBar: {
     justifyContent: "center",
     alignItems: "center",
     width: 75,
     height: 75,
     borderRadius: 37.5,
-    backgroundColor: Colours.primary,
   },
 
   popup: {
@@ -1107,7 +1055,6 @@ const styles = StyleSheet.create({
   popupBox: {
     width: "100%",
     maxWidth: 340,
-    backgroundColor: Colours.surface,
     borderRadius: 20,
     padding: 25,
     elevation: 8,
@@ -1137,13 +1084,11 @@ const styles = StyleSheet.create({
   popupText: {
     fontWeight: "800",
     fontSize: 22,
-    color: Colours.defaultText,
     textAlign: "center",
     marginBottom: 20,
   },
 
   popupInfo: {
-    color: Colours.grayText,
     fontWeight: "600",
     marginBottom: 5,
     marginTop: 10,
@@ -1152,13 +1097,10 @@ const styles = StyleSheet.create({
   textInp: {
     width: "100%",
     height: 50,
-    backgroundColor: Colours.surface,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#e0e0e0",
     paddingHorizontal: 15,
     fontSize: 16,
-    color: Colours.defaultText,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
@@ -1179,10 +1121,8 @@ const styles = StyleSheet.create({
   },
 
   inpType: {
-    backgroundColor: Colours.surface,
     height: 50,
     borderWidth: 1,
-    borderColor: "#e0e0e0",
     borderRadius: 10,
     justifyContent: "center",
     paddingHorizontal: 15,
@@ -1213,7 +1153,7 @@ const styles = StyleSheet.create({
   pill: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between"
+    justifyContent: "center"
   },
 
   pillButton: {
@@ -1222,47 +1162,25 @@ const styles = StyleSheet.create({
     marginHorizontal: 5,
     borderRadius: 10,
     borderWidth: 1.5,
-    borderColor: Colours.secondary,
     alignItems: "center",
-    backgroundColor: "#f8f8f8",
-  },
-
-  activeButton: {
-    backgroundColor: Colours.primary,
-    borderColor: Colours.primary,
   },
 
   pillText: {
-    color: Colours.secondaryText,
     fontWeight: "600",
   },
 
-  activeText: {
-    color: "white",
-  },
-
-  // Group MODAL
-
   leftButton: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    backgroundColor: Colours.primary,
+    paddingHorizontal: 25,
+    paddingVertical: 10,
     borderTopLeftRadius: 25,
     borderBottomLeftRadius: 25,
-    justifyContent: "center",
-    alignItems: "center",
-    marginHorizontal: 10,
   },
 
   rightButton: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    backgroundColor: Colours.primary,
+    paddingHorizontal: 25,
+    paddingVertical: 10,
     borderTopRightRadius: 25,
     borderBottomRightRadius: 25,
-    justifyContent: "center",
-    alignItems: "center",
-    marginHorizontal: 10,
   },
 
   iconOption: {
@@ -1270,8 +1188,6 @@ const styles = StyleSheet.create({
     height: 55,
     borderRadius: 15,
     borderWidth: 1,
-    borderColor: "#ddd",
-    backgroundColor: Colours.surface,
     justifyContent: "center",
     alignItems: "center",
     marginRight: 10,
@@ -1279,45 +1195,7 @@ const styles = StyleSheet.create({
   },
 
   iconSelected: {
-    backgroundColor: "#0F6EC6",
-    borderColor: "#0F6EC6",
     elevation: 4,
-  },
-
-  pill: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 10,
-  },
-
-  leftButton: {
-    paddingHorizontal: 25,
-    paddingVertical: 10,
-    borderTopLeftRadius: 25,
-    borderBottomLeftRadius: 25,
-    backgroundColor: "#e0e0e0",
-  },
-
-  rightButton: {
-    paddingHorizontal: 25,
-    paddingVertical: 10,
-    borderTopRightRadius: 25,
-    borderBottomRightRadius: 25,
-    backgroundColor: "#e0e0e0",
-  },
-
-  pillText: {
-    fontWeight: "600",
-    color: Colours.defaultText,
-  },
-
-  activeButton: {
-    backgroundColor: "#0F6EC6",
-  },
-
-  activeText: {
-    color: "white",
   },
 
   colorRow: {
@@ -1351,7 +1229,6 @@ const styles = StyleSheet.create({
   modalBox: {
     width: "100%",
     maxWidth: 360,
-    backgroundColor: Colours.surface,
     borderRadius: 20,
     padding: 20,
     elevation: 8,
@@ -1365,7 +1242,6 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 22,
     fontWeight: "800",
-    color: Colours.defaultText,
     textAlign: "center",
     marginBottom: 20,
   },
@@ -1378,7 +1254,6 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: "700",
-    color: Colours.defaultText,
     marginBottom: 10,
   },
 
@@ -1393,7 +1268,6 @@ const styles = StyleSheet.create({
     position: "absolute",
     fontSize: 20,
     fontWeight: "700",
-    color: Colours.defaultText,
   },
 
   cardRow: {
@@ -1415,7 +1289,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     fontSize: 14,
     marginTop: 5,
-    color: Colours.defaultText,
     textAlign: "center",
   },
 
@@ -1423,14 +1296,12 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     fontSize: 18,
     marginTop: 5,
-    color: Colours.defaultText,
   },
 
   progressBarBackground: {
     width: "100%",
     height: 12,
     borderRadius: 6,
-    backgroundColor: "#e0e0e0",
     overflow: "hidden",
   },
 
@@ -1438,29 +1309,6 @@ const styles = StyleSheet.create({
     height: 12,
     backgroundColor: "#0F6EC6",
     borderRadius: 6,
-  },
-  
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.35)",
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 20,
-  },
-
-  modalBox: {
-    width: "100%",
-    maxWidth: 350,
-    backgroundColor: "#fff",
-    borderRadius: 25,
-    paddingVertical: 25,
-    paddingHorizontal: 20,
-    elevation: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    position: "relative",
   },
 
   groupIconWrapper: {
@@ -1480,14 +1328,12 @@ const styles = StyleSheet.create({
   groupName: {
     fontWeight: "800",
     fontSize: 20,
-    color: "#111",
     textAlign: "center",
     marginBottom: 5,
   },
 
   groupMembersText: {
     fontSize: 14,
-    color: "#666",
     textAlign: "center",
   },
 
@@ -1497,25 +1343,9 @@ const styles = StyleSheet.create({
     marginVertical: 12,
   },
 
-  statsCard: {
-    flex: 1,
-    backgroundColor: "#F5F5F5",
-    paddingVertical: 15,
-    paddingHorizontal: 10,
-    borderRadius: 18,
-    alignItems: "center",
-    marginHorizontal: 5,
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-  },
-
   statsCardTitle: {
     fontWeight: "600",
     fontSize: 14,
-    color: "#333",
     marginTop: 5,
     textAlign: "center",
   },
@@ -1524,7 +1354,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     fontSize: 18,
     marginTop: 5,
-    color: "#111",
   },
 
   leaveButton: {
@@ -1548,6 +1377,4 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginRight: 8,
   },
-
-
 });

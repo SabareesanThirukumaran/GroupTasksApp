@@ -1,10 +1,9 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Stack, router, useSegments, usePathname } from 'expo-router';
-import { onAuthStateChanged } from 'firebase/auth';
-import { auth } from '../firebase/config';
 import {updateLastActive} from "../firebase/firebaseService";
 import {AuthProvider, useAuth} from "../context/AuthContext";
 import { DataProvider } from '../context/DataContext';
+import { ThemeProvider } from '../context/ThemeContext';
 
 function NavigationHandler() {
   const segments = useSegments();
@@ -45,15 +44,17 @@ function NavigationHandler() {
 
 export default function RootLayout() {
   return (
-    <AuthProvider>
-      <NavigationHandler />
-      <DataProvider>
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="index" />
-          <Stack.Screen name="(auth)" />
-          <Stack.Screen name="(tabs)" />
-        </Stack>
-      </DataProvider>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <NavigationHandler />
+        <DataProvider>
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="index" />
+            <Stack.Screen name="(auth)" />
+            <Stack.Screen name="(tabs)" />
+          </Stack>
+        </DataProvider>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
