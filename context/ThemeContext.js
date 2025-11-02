@@ -48,15 +48,20 @@ export const darkTheme = {
   StatsCard4: "#292929",
 };
 
-export const ThemeProvider = ({ children }) => {
+export const ThemeProvider = ({ children, userId }) => {
   const systemColorScheme = useColorScheme();
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [themePreference, setThemePreference] = useState('system');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadThemePreference();
-  }, []);
+    if (userId) {
+      loadThemePreference(userId);
+    } else {
+      setThemePreference('system');
+      setLoading(false);
+    }
+  }, [userId]);
 
   useEffect(() => {
     if (themePreference === 'system') {
@@ -66,11 +71,13 @@ export const ThemeProvider = ({ children }) => {
     }
   }, [themePreference, systemColorScheme]);
 
-  const loadThemePreference = async () => {
+  const loadThemePreference = async (uid) => {
     try {
-      const savedPreference = await AsyncStorage.getItem('themePreference');
+      const savedPreference = await AsyncStorage.getItem(`themePreference_${uid}`);
       if (savedPreference) {
         setThemePreference(savedPreference);
+      } else {
+        setThemePreference('system');
       }
     } catch (error) {
       console.error('Error loading theme preference:', error);
@@ -80,8 +87,13 @@ export const ThemeProvider = ({ children }) => {
   };
 
   const saveThemePreference = async (preference) => {
+    if (!userId) {
+      console.warn('Cannot save theme preference: No user logged in');
+      return;
+    }
+    
     try {
-      await AsyncStorage.setItem('themePreference', preference);
+      await AsyncStorage.setItem(`themePreference_${userId}`, preference);
       setThemePreference(preference);
     } catch (error) {
       console.error('Error saving theme preference:', error);

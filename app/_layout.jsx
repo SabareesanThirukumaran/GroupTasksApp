@@ -42,19 +42,27 @@ function NavigationHandler() {
   return null;
 }
 
+function AppContent() {
+  const { user } = useAuth();
+  
+  return (
+    <ThemeProvider userId={user?.uid}>
+      <NavigationHandler />
+      <DataProvider>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="index" />
+          <Stack.Screen name="(auth)" />
+          <Stack.Screen name="(tabs)" />
+        </Stack>
+      </DataProvider>
+    </ThemeProvider>
+  );
+}
+
 export default function RootLayout() {
   return (
-    <ThemeProvider>
-      <AuthProvider>
-        <NavigationHandler />
-        <DataProvider>
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="index" />
-            <Stack.Screen name="(auth)" />
-            <Stack.Screen name="(tabs)" />
-          </Stack>
-        </DataProvider>
-      </AuthProvider>
-    </ThemeProvider>
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }

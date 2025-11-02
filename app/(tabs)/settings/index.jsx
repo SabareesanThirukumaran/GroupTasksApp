@@ -6,6 +6,7 @@ import { deleteAccount, uploadProfilePicture, updateUserProfile} from '../../../
 import LoadingScreen from '../../../components/loadingScreen';
 import { useTheme } from "../../../context/ThemeContext";
 import { signOut, EmailAuthProvider, reauthenticateWithCredential, updatePassword } from "firebase/auth";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { auth } from "../../../firebase/config";
 import ToastAlert from "../../../toastAlert";
 import * as Clipboard from "expo-clipboard";
@@ -30,7 +31,38 @@ export default function SettingsScreen() {
       setUserEmail(user.email || '');
     }
   }, [user]);
-  
+
+  useEffect(() => {
+    loadNotificationPreference();
+  }, []);
+
+  const loadNotificationPreference = async () => {
+    try {
+      const saved = await AsyncStorage.getItem(`notificationsEnabled_${user.uid}`);
+      if (saved !== null) {
+        setNotificationsEnabled(JSON.parse(saved));
+      }
+    } catch (error) {
+      console.error('Error loading notification preference:', error);
+    }
+  };
+
+  const handleToggleNotifications = async (value) => {
+    try {
+      setNotificationsEnabled(value);
+      await AsyncStorage.setItem(`notificationsEnabled_${user.uid}`, JSON.stringify(value));
+      
+      if (value) {
+        showAlertText('Notifications enabled');
+      } else {
+        showAlertText('Notifications disabled');
+      }
+    } catch (error) {
+      console.error('Error saving notification preference:', error);
+      showAlertText('Failed to update notification settings');
+    }
+  };
+    
   const [showNameModal, setShowNameModal] = useState(false);
   const [tempName, setTempName] = useState(userName);
   const [uploading, setUploading] = useState(false);
@@ -267,7 +299,7 @@ export default function SettingsScreen() {
         </SettingsSection>
 
         <SettingsSection title="Preferences">
-          <SettingsItem icon="notifications-outline"title="Notifications"subtitle="Push notifications for tasks"showArrow={false}rightComponent={<Switch value={notificationsEnabled} onValueChange={setNotificationsEnabled} trackColor={{ false: '#ddd', true: theme.primary }} thumbColor={theme.primaryText}/>}/>
+          <SettingsItem icon="notifications-outline"title="Notifications"subtitle="Push notifications for tasks"showArrow={false}rightComponent={<Switch value={notificationsEnabled} onValueChange={handleToggleNotifications} trackColor={{ false: '#ddd', true: theme.primary }} thumbColor={theme.primaryText}/>}/>
           <SettingsItem  icon={isDarkMode ? "moon" : "sunny"} title="Theme" subtitle={getThemeDisplayText()}
             onPress={() => setShowThemeModal(true)}/>  
         </SettingsSection>

@@ -310,6 +310,38 @@ export default function GroupScreen() {
 
       setMyGroups([...myGroups, updatedGroup]);
       setAllGroups(updatedAllGroups);
+
+      try {
+        const { success, tasks: groupTasks } = await getUserTasks([findGroup.id]);
+        
+        if (success && groupTasks && groupTasks.length > 0) {
+          setTasks(prevTasks => {
+            const existingTaskIds = new Set(prevTasks.map(t => t.id));
+            const newTasks = groupTasks.filter(task => !existingTaskIds.has(task.id));
+            return [...prevTasks, ...newTasks];
+          });
+          
+          const tasksWithDueDates = groupTasks.filter(task => task.dueDate && !task.completed);
+          
+          if (tasksWithDueDates.length > 0) {
+            console.log(`Scheduling notifications for ${tasksWithDueDates.length} tasks...`);
+            for (const task of tasksWithDueDates) {
+              try {
+                await scheduleTaskDeadlineNotification(task, userId);
+              } catch (error) {
+                console.error(`Failed to schedule notification for task ${task.id}:`, error);
+              }
+            }
+            
+            console.log(`✅ Scheduled notifications for ${tasksWithDueDates.length} tasks`);
+          }
+          
+          console.log(`Fetched ${groupTasks.length} tasks for newly joined group`);
+        }
+      } catch (error) {
+        console.error("Error fetching tasks for newly joined group:", error);
+      }
+
       showAlertText("Successfully joined the group!");
       console.log("Successfully joined")
       setShowJoinGroupModal(false);
@@ -411,7 +443,7 @@ export default function GroupScreen() {
       };
 
       if (newTask.dueDate) {
-        await scheduleTaskDeadlineNotification(newTask);
+        await scheduleTaskDeadlineNotification(newTask, userId);
       }
 
       setTasks((prevTasks) => [...prevTasks, newTask]);
@@ -454,7 +486,7 @@ export default function GroupScreen() {
             const result = await deleteTaskDB(taskId);
 
             if (result.success) {
-              await cancelTaskNotifications(id);
+              await cancelTaskNotifications(taskId);
               setTasks(tasks.filter(task => task.id !== taskId));
               setShowTasksModal(false);
               setSelectedTask(null)

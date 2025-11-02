@@ -307,7 +307,7 @@ export default function TaskScreen() {
       };
 
       if (newTask.dueDate) {
-        await scheduleTaskDeadlineNotification(newTask);
+        await scheduleTaskDeadlineNotification(newTask, userId);
       }
 
       setTasks((prevTasks) => [...prevTasks, newTask]);

@@ -14,6 +14,17 @@ Notifications.setNotificationHandler({
     })
 });
 
+export async function areNotificationsEnabled(userId) {
+  try {
+    if (!userId) return true;
+    const saved = await AsyncStorage.getItem(`notificationsEnabled_${userId}`);
+    return saved === null ? true : JSON.parse(saved);
+  } catch (error) {
+    console.error('Error checking notification preference:', error);
+    return true;
+  }
+}
+
 export async function requestNotificationPermissions() {
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('default', {
@@ -40,9 +51,15 @@ export async function requestNotificationPermissions() {
   return true;
 }
 
-export async function scheduleTaskDeadlineNotification(task) {
+export async function scheduleTaskDeadlineNotification(task, userId) {
   try {
     if (!task.dueDate) return null;
+
+    const notificationsEnabled = await areNotificationsEnabled(userId);
+    if (!notificationsEnabled) {
+      console.log('Notifications are disabled by user');
+      return null;
+    }
 
     const hasPermission = await requestNotificationPermissions();
     if (!hasPermission) {
