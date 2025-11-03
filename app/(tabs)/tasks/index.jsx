@@ -220,7 +220,7 @@ export default function TaskScreen() {
         },
       };
 
-      if (!task.deletedBy || task.deletedBy.includes(userId)) return null;
+      if (task.deletedBy && task.deletedBy.includes(userId)) return null;
 
       return (
         <Swipeable

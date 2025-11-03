@@ -1,12 +1,11 @@
 {
   "expo": {
-    "name": "GroupTasksApp",
+    "name": "GroupTasks",
     "slug": "GroupTasksApp",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": false,
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -20,8 +19,14 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
+      "permissions": [
+        "NOTIFICATIONS",
+        "RECEIVE_BOOT_COMPLETED",
+        "SCHEDULE_EXACT_ALARM"
+      ],
       "edgeToEdgeEnabled": true,
-      "package": "com.dev.GroupTasksApp"
+      "package": "com.dev.GroupTasksApp",
+      "versionCode": 1
     },
     "web": {
       "favicon": "./assets/favicon.png"

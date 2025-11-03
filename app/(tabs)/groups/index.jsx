@@ -440,6 +440,10 @@ export default function GroupScreen() {
         description: taskDescription,
         groupId: selectedGroupT.id,
         completed: false,
+        completedBy: [],
+        completedAt: [],
+        deletedBy: [],
+        createdBy: userId,
       };
 
       if (newTask.dueDate) {
@@ -688,53 +692,43 @@ export default function GroupScreen() {
 
       <Modal visible={showAddTaskModal} animationType="fade" transparent={true} onRequestClose={() => setShowAddTaskModal(false)}>
         <View style={styles.popup}>
-          <View style={styles.popupBox}>
+          <View style={[styles.popupBox, { backgroundColor: theme.surface }]}>
             <TouchableOpacity style={styles.close} onPress={() => setShowAddTaskModal(false)}>
               <AntDesign name="close-circle" size={30} color="white"></AntDesign>
             </TouchableOpacity>
 
-            <Text style={styles.popupText}>Create Task</Text>
+            <Text style={[styles.popupText, { color: theme.defaultText }]}>Create Task</Text>
 
-
-            <Text style={styles.popupInfo}>Task*</Text>
-            <TextInput style={styles.textInp} placeholder="Complete Project..." placeholderTextColor={theme.textSecondary} value={taskName} onChangeText={setTaskName}/>
+            <Text style={[styles.popupInfo, { color: theme.defaultText }]}>Task*</Text>
+            <TextInput style={[styles.textInp, { backgroundColor: theme.surface, borderColor: theme.surfaceBorder, color: theme.defaultText }]} placeholder="Complete Project..." placeholderTextColor={theme.grayText} value={taskName} onChangeText={setTaskName}/>
 
             <View style={{ flexDirection: "row", alignItems: "center", marginVertical: 10 }}>
-              <Switch value={hasDueDate} onValueChange={setHasDueDate} thumbColor={hasDueDate ? theme.primary : theme.grayText} trackColor={{ false: "#aaa", true: theme.primary }}/>
+              <Switch value={hasDueDate} onValueChange={setHasDueDate} thumbColor={hasDueDate ? theme.primary : "#ccc"} trackColor={{ false: "#aaa", true: theme.primary }}/>
               <Text style={{ marginLeft: 10, color: theme.defaultText, fontWeight: "600" }}>Add a due date?</Text>
             </View>
 
             {hasDueDate && (
               <View style={styles.DateTimePickers}>
                 <View style={styles.popupPicker}>
-                  <Text style={styles.popupInfo}>Date*</Text>
-                  <TouchableOpacity style={styles.inpType} onPress={() => setShowDatePicker(true)}>
-                    <Text>{taskDate.toDateString()}</Text>
-                  </TouchableOpacity>
-                </View>
-
-                <View style={styles.popupPicker}>
-                  <Text style={styles.popupInfo}>Time*</Text>
-                  <TouchableOpacity style={styles.inpType} onPress={() => setShowTimePicker(true)}>
-                    <Text>
-                      {taskTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                    </Text>
+                  <Text style={[styles.popupInfo, { color: theme.defaultText }]}>Date*</Text>
+                  <TouchableOpacity style={[styles.inpType, { backgroundColor: theme.surface, borderColor: theme.surfaceBorder }]} onPress={() => setShowDatePicker(true)}>
+                    <Text style={{color: theme.grayText}}>{taskDate.toDateString()}</Text>
                   </TouchableOpacity>
                 </View>
               </View>
             )}
 
-            <Text style={styles.popupInfo}>Difficulty</Text>
+            <Text style={[styles.popupInfo, { color: theme.defaultText }]}>Difficulty</Text>
             <View style={styles.pill}>
               {['Easy', 'Medium', 'Hard'].map((level) => (
-                <TouchableOpacity key={level} style={[styles.pillButton, difficulty === level && styles.activeButton]} onPress={() => setDifficulty(level)}>
-                  <Text style={[styles.pillText, difficulty === level && styles.activeText]}>{level}</Text>
+                <TouchableOpacity key={level} style={[styles.pillButton, { backgroundColor: difficulty === level ? theme.primary : theme.surfaceBorder, borderColor: difficulty === level ? theme.primary : theme.secondary }]} onPress={() => setDifficulty(level)}>
+                  <Text style={[styles.pillText, { color: difficulty === level ? "white" : theme.secondaryText }]}>{level}</Text>
                 </TouchableOpacity>
               ))}
             </View>
 
-            <Text style={styles.popupInfo}>Description</Text>
-            <TextInput style={[styles.textInp, { height: 80, textAlignVertical: "top" }]} placeholder="Add more details..." placeholderTextColor={theme.textSecondary} value={taskDescription} onChangeText={setTaskDescription}multiline/>
+            <Text style={[styles.popupInfo, { color: theme.defaultText }]}>Description</Text>
+            <TextInput style={[styles.textInp, { height: 80, textAlignVertical: "top", backgroundColor: theme.surface, borderColor: theme.surfaceBorder, color: theme.defaultText }]} placeholder="Add more details..." placeholderTextColor={theme.textSecondary} value={taskDescription} onChangeText={setTaskDescription}multiline/>
 
             <TouchableOpacity style={styles.addButton} onPress={() => addTask(taskName, hasDueDate ? taskDate : null, difficulty, selectedGroupT, taskDescription)}>
               <Text style={styles.addText}>Add Task</Text>
@@ -742,7 +736,6 @@ export default function GroupScreen() {
             </TouchableOpacity>
 
             {showDatePicker && ( <DateTimePicker value={taskDate} mode="date" display={Platform.OS === "ios" ? "spinner" : "default"} onChange={(event, selectedDate) => {setShowDatePicker(false); if (selectedDate) setTaskDate(selectedDate);}}/>)}
-            {showTimePicker && ( <DateTimePicker value={taskTime} mode="time" is24Hour={true} display={Platform.OS === "ios" ? "spinner" : "default"} onChange={(event, selectedTime) => { setShowTimePicker(false); if (selectedTime) setTaskTime(selectedTime); }} />)}
           </View>
         </View>
       </Modal>
@@ -1306,6 +1299,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: "#0F6EC6",
     paddingVertical: 14,
     borderRadius: 12,
     marginTop: 25,
