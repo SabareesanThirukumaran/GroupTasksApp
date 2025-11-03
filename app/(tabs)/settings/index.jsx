@@ -33,10 +33,13 @@ export default function SettingsScreen() {
   }, [user]);
 
   useEffect(() => {
-    loadNotificationPreference();
-  }, []);
+    if (user?.uid) {
+      loadNotificationPreference();
+    }
+  }, [user]);
 
   const loadNotificationPreference = async () => {
+    if (!user?.uid) return;
     try {
       const saved = await AsyncStorage.getItem(`notificationsEnabled_${user.uid}`);
       if (saved !== null) {
@@ -48,6 +51,10 @@ export default function SettingsScreen() {
   };
 
   const handleToggleNotifications = async (value) => {
+    if (!user?.uid) {
+      showAlertText('Please wait...');
+      return;
+    }
     try {
       setNotificationsEnabled(value);
       await AsyncStorage.setItem(`notificationsEnabled_${user.uid}`, JSON.stringify(value));

@@ -1,7 +1,8 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { Stack, router, useSegments, usePathname } from 'expo-router';
-import {updateLastActive} from "../firebase/firebaseService";
-import {AuthProvider, useAuth} from "../context/AuthContext";
+import { View, ActivityIndicator } from 'react-native';  // ✅ Add these imports
+import { updateLastActive } from "../firebase/firebaseService";
+import { AuthProvider, useAuth } from "../context/AuthContext";
 import { DataProvider } from '../context/DataContext';
 import { ThemeProvider } from '../context/ThemeContext';
 
@@ -43,10 +44,23 @@ function NavigationHandler() {
 }
 
 function AppContent() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();  // ✅ Add loading
+  
+  if (loading) {
+    return (
+      <View style={{ 
+        flex: 1, 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        backgroundColor: '#f2f5ff' 
+      }}>
+        <ActivityIndicator size="large" color="#0F6EC6" />
+      </View>
+    );
+  }
   
   return (
-    <ThemeProvider userId={user?.uid}>
+    <ThemeProvider userId={user?.uid || null}>
       <NavigationHandler />
       <DataProvider>
         <Stack screenOptions={{ headerShown: false }}>
